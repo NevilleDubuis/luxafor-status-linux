@@ -1,4 +1,4 @@
-# Contributing to luxafor-status
+# Contributing to luxafor-status-linux
 
 Thanks for your interest! Every contribution is welcome, from a one-line
 "works with my Flag" report to a new feature.

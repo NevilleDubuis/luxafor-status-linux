@@ -1,4 +1,4 @@
-# luxafor-status
+# luxafor-status-linux
 
 Control a **Luxafor** status light from Ubuntu, with:
 
@@ -32,8 +32,8 @@ open an issue or a PR to report whether it works — even a quick "works for me"
 ## Installation
 
 ```bash
-git clone https://github.com/NevilleDubuis/luxafor-status-.git luxafor-status
-cd luxafor-status
+git clone https://github.com/NevilleDubuis/luxafor-status-linux.git
+cd luxafor-status-linux
 ./install.sh
 ```
 
