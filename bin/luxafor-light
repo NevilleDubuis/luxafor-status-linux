@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# luxafor-light — minimal driver for Luxafor USB lights, no dependencies.
+#
+#   luxafor-light <color>     set a color: name (red, orange…) or hex (#ff8800)
+#   luxafor-light off         turn the light off
+#   luxafor-light list        list connected Luxafor lights
+#
+# It writes the Luxafor HID "static color" command directly to the
+# light's /dev/hidraw* device:  01 FF R G B 00 00 00
+# (01 = static color, FF = all LEDs). Access without sudo is granted by
+# the udev rule installed with luxafor-status.
+#
+# Environment:
+#   LUXAFOR_IDS     space-separated vendor:product IDs to look for
+#                   (default: 04d8:f372)
+#   LUXAFOR_SYSFS   sysfs root, for tests (default: /sys)
+#   LUXAFOR_DEV     /dev root, for tests (default: /dev)
+set -u
+
+IDS="${LUXAFOR_IDS:-04d8:f372}"
+SYSFS="${LUXAFOR_SYSFS:-/sys}"
+DEV="${LUXAFOR_DEV:-/dev}"
+
+die() { echo "luxafor-light: $1" >&2; exit "${2:-1}"; }
+
+# --- color parsing ------------------------------------------------------------
+
+# CSS color names (same values as the CSS standard).
+named_color() {
+    case "$1" in
+        black)   echo 000000 ;; white)   echo ffffff ;; gray|grey) echo 808080 ;;
+        silver)  echo c0c0c0 ;; red)     echo ff0000 ;; maroon)  echo 800000 ;;
+        orange)  echo ffa500 ;; darkorange) echo ff8c00 ;; gold) echo ffd700 ;;
+        yellow)  echo ffff00 ;; olive)   echo 808000 ;; lime)    echo 00ff00 ;;
+        green)   echo 008000 ;; teal)    echo 008080 ;; cyan|aqua) echo 00ffff ;;
+        blue)    echo 0000ff ;; navy)    echo 000080 ;; purple)  echo 800080 ;;
+        magenta|fuchsia) echo ff00ff ;; violet) echo ee82ee ;; pink) echo ffc0cb ;;
+        hotpink) echo ff69b4 ;; deeppink) echo ff1493 ;; turquoise) echo 40e0d0 ;;
+        indigo)  echo 4b0082 ;; crimson) echo dc143c ;; coral)   echo ff7f50 ;;
+        tomato)  echo ff6347 ;; salmon)  echo fa8072 ;; skyblue) echo 87ceeb ;;
+        royalblue) echo 4169e1 ;; springgreen) echo 00ff7f ;; chartreuse) echo 7fff00 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Prints "R G B" in decimal for a color name, #rgb, #rrggbb or rrggbb.
+parse_color() {
+    local c hex
+    c="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+    if hex="$(named_color "$c")"; then :
+    elif [[ "$c" =~ ^#?([0-9a-f]{6})$ ]]; then hex="${BASH_REMATCH[1]}"
+    elif [[ "$c" =~ ^#?([0-9a-f])([0-9a-f])([0-9a-f])$ ]]; then
+        hex="${BASH_REMATCH[1]}${BASH_REMATCH[1]}${BASH_REMATCH[2]}${BASH_REMATCH[2]}${BASH_REMATCH[3]}${BASH_REMATCH[3]}"
+    else
+        return 1
+    fi
+    echo "$((16#${hex:0:2})) $((16#${hex:2:2})) $((16#${hex:4:2}))"
+}
+
+# --- device discovery ---------------------------------------------------------
+
+# Prints "<hidraw name>\t<product name>" for each matching light.
+find_lights() {
+    local uevent dir name hid_id vid pid id want_vid want_pid product
+    for uevent in "$SYSFS"/class/hidraw/hidraw*/device/uevent; do
+        [ -f "$uevent" ] || continue
+        dir="$(dirname "$(dirname "$uevent")")"
+        name="$(basename "$dir")"
+        hid_id="$(sed -n 's/^HID_ID=//p' "$uevent")"          # 0003:000004D8:0000F372
+        product="$(sed -n 's/^HID_NAME=//p' "$uevent")"
+        vid="$(printf '%s' "${hid_id#*:}" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')"
+        pid="$(printf '%s' "${hid_id##*:}" | tr '[:upper:]' '[:lower:]')"
+        for id in $IDS; do
+            want_vid="0000${id%%:*}"; want_pid="0000${id##*:}"
+            if [ "$vid" = "${want_vid: -8}" ] && [ "$pid" = "${want_pid: -8}" ]; then
+                printf '%s\t%s\n' "$name" "${product:-Luxafor}"
+            fi
+        done
+    done
+}
+
+# Writes one 8-byte report to every light. hidraw expects the report ID
+# first; Luxafor lights don't use numbered reports, so it is 0.
+send() {
+    local lights name sent=0 failed=0 bytes
+    lights="$(find_lights)"
+    [ -n "$lights" ] || die "no Luxafor light found — is it plugged in?"
+    bytes="$(printf '\\x%02x' 0 "$@")"
+    while IFS=$'\t' read -r name _; do
+        # shellcheck disable=SC2059  # the format string is built from hex escapes on purpose
+        if printf "$bytes" > "$DEV/$name" 2>/dev/null; then
+            sent=$((sent + 1))
+        else
+            failed=$((failed + 1))
+            echo "luxafor-light: cannot write to $DEV/$name (permission denied? replug the light)" >&2
+        fi
+    done <<< "$lights"
+    [ "$sent" -gt 0 ] || exit 1
+    [ "$failed" -eq 0 ]
+}
+
+# --- main ---------------------------------------------------------------------
+
+case "${1:-}" in
+    ""|-h|--help)
+        sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'
+        [ -n "${1:-}" ]; exit $? ;;
+    list)
+        lights="$(find_lights)"
+        [ -n "$lights" ] || { echo "No Luxafor light found." >&2; exit 1; }
+        i=0
+        while IFS=$'\t' read -r name product; do
+            printf '%d  %s  (%s/%s)\n' "$i" "$product" "$DEV" "$name"; i=$((i + 1))
+        done <<< "$lights"
+        ;;
+    off)
+        send 1 255 0 0 0 0 0 0 ;;
+    *)
+        rgb="$(parse_color "$1")" || die "unknown color '$1' — use a name (red, orange…) or a hex code (#ff8800)" 2
+        # shellcheck disable=SC2086  # split "R G B" into three arguments
+        send 1 255 $rgb 0 0 0 ;;
+esac

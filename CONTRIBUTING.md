@@ -9,7 +9,7 @@ So far only the **wired Luxafor ORB** has been tested. If you try another
 model, please open an issue with:
 
 - the model (e.g. Luxafor Flag, Bluetooth, Mute);
-- the output of `lsusb | grep -i 04d8` and `busylight list`;
+- the output of `lsusb | grep -i 04d8` and `luxafor-light list`;
 - your distribution and desktop (e.g. Ubuntu 24.04, Budgie / GNOME / KDE);
 - whether it worked, and what didn't.
 
@@ -25,7 +25,7 @@ Running `luxafor-toggle` from a terminal usually prints a useful error message.
 3. Check your shell scripts with [ShellCheck](https://www.shellcheck.net/):
 
    ```bash
-   shellcheck install.sh uninstall.sh bin/luxafor-toggle
+   shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle
    python3 -m py_compile bin/luxafor-tray
    ```
 
@@ -35,13 +35,14 @@ Running `luxafor-toggle` from a terminal usually prints a useful error message.
 ## Project layout
 
 ```
-bin/luxafor-toggle     sets or cycles the status (calls `busylight`), and generates
+bin/luxafor-light      driver: writes HID reports to /dev/hidraw* (pure bash)
+bin/luxafor-toggle     sets or cycles the status (calls luxafor-light), and generates
                        the status icons and the dock launcher (--reload)
 bin/luxafor-tray       tray icon showing the current status (Python + AppIndicator)
 share/statuses.conf    default status configuration
 share/icons/           application icon (luxafor-status)
 share/applications/    tray autostart template (@BINDIR@ is replaced at install time)
-udev/                  fallback udev rule
+udev/                  udev rule granting the logged-in user access to the light
 install.sh             per-user installer
 uninstall.sh           uninstaller
 ```
@@ -61,6 +62,23 @@ Runtime files:
   name prevents hosts from showing a cached icon after a color change.
   The prefix deliberately shares nothing with other icon names — see the
   comment in `bin/luxafor-tray` (GTK generic fallback).
+
+## Testing without a light
+
+`luxafor-light` reads `LUXAFOR_SYSFS` and `LUXAFOR_DEV`, so you can point it at
+a fake sysfs tree and regular files, then check the bytes written:
+
+```bash
+mkdir -p /tmp/lx/sys/class/hidraw/hidraw0/device /tmp/lx/dev
+printf 'HID_ID=0003:000004D8:0000F372\nHID_NAME=Fake Luxafor\n' \
+  > /tmp/lx/sys/class/hidraw/hidraw0/device/uevent
+touch /tmp/lx/dev/hidraw0
+LUXAFOR_SYSFS=/tmp/lx/sys LUXAFOR_DEV=/tmp/lx/dev bin/luxafor-light orange
+od -An -tx1 /tmp/lx/dev/hidraw0     # 00 01 ff ff a5 00 00 00 00
+```
+
+To support another model, add its `vendor:product` ID to `IDS` in
+`bin/luxafor-light` and to `udev/70-luxafor-status.rules`.
 
 ## Code of conduct
 

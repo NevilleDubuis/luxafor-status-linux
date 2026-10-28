@@ -62,10 +62,10 @@ index_of() {
     return 1
 }
 
-find_busylight() {
-    BL="$(command -v busylight || true)"
-    [ -z "$BL" ] && [ -x "$HOME/.local/bin/busylight" ] && BL="$HOME/.local/bin/busylight"
-    [ -n "$BL" ] || die "'busylight' not found — re-run install.sh"
+find_driver() {
+    LIGHT="$BINDIR/luxafor-light"
+    [ -x "$LIGHT" ] || LIGHT="$(command -v luxafor-light || true)"
+    [ -n "$LIGHT" ] || die "'luxafor-light' not found — re-run install.sh"
 }
 
 desktop_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g'; }
@@ -165,15 +165,14 @@ else
     fi
 fi
 
-find_busylight
+find_driver
 
 if [ "$NEXT" = off ]; then
-    "$BL" off >/dev/null 2>&1 || die "could not reach the light — is it plugged in?"
+    ERR="$("$LIGHT" off 2>&1)" || die "${ERR#luxafor-light: }"
     LABEL="Off"
 else
     i="$(index_of "$NEXT")"
-    "$BL" on "${COLORS[$i]}" >/dev/null 2>&1 \
-        || die "could not set color '${COLORS[$i]}' — is the light plugged in and the color valid?"
+    ERR="$("$LIGHT" "${COLORS[$i]}" 2>&1)" || die "${ERR#luxafor-light: }"
     LABEL="${LABELS[$i]}"
 fi
 

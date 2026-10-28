@@ -16,17 +16,17 @@ Default statuses:
 | On a call | 🟡 yellow |
 | Off       | ⚪ —      |
 
-Luxafor's official software does not support Linux. This project builds on
-[busylight-for-humans](https://pypi.org/project/busylight-for-humans/), an open
-source driver that supports most Luxafor lights.
+Luxafor's official software does not support Linux. This project talks to the
+light directly through its documented USB HID protocol: **no driver to install,
+no Python package, nothing but bash** for the light itself.
 
 ## Hardware support
 
 > [!IMPORTANT]
 > So far, this has **only been tested with the wired Luxafor ORB**, on Ubuntu Budgie.
 
-Other Luxafor models (Flag, Bluetooth, Mute…) are supported by the underlying
-driver and *should* work, but haven't been verified yet. If you try one, please
+Other Luxafor models that use the same USB protocol (such as the Flag) *should*
+work, but haven't been verified yet. If you try one, please
 open an issue or a PR to report whether it works — even a quick "works for me" helps.
 
 ## Installation
@@ -39,12 +39,11 @@ cd luxafor-status-linux
 
 The installer:
 
-1. installs the required packages (`pipx`, GTK/AppIndicator bindings, `notify-send`);
-2. installs `busylight-for-humans` with `pipx`;
-3. adds a **udev** rule so the light can be used without `sudo`;
-4. copies the scripts to `~/.local/bin`, adds the launcher to the app menu, and starts the tray icon at login.
+1. installs the required packages (GTK/AppIndicator bindings for the tray icon, `notify-send`);
+2. adds a **udev** rule so the light can be used without `sudo`;
+3. copies the scripts to `~/.local/bin`, adds the launcher to the app menu, and starts the tray icon at login.
 
-It only asks for your `sudo` password for steps 1 and 3.
+It only asks for your `sudo` password for steps 1 and 2.
 **Unplug and replug the light** after the first install.
 
 Options:
@@ -67,6 +66,14 @@ Options:
   luxafor-toggle off
   luxafor-toggle --list       # list your statuses
   luxafor-toggle --current    # print the current status
+  ```
+
+  Or drive the light directly, without statuses:
+
+  ```bash
+  luxafor-light orange        # any color, see below
+  luxafor-light off
+  luxafor-light list          # connected lights
   ```
 
   Handy for a custom keyboard shortcut (Settings → Keyboard → Custom Shortcuts).
@@ -92,7 +99,11 @@ lunch     | orange  | Lunch break
 ```
 
 - **id** — the short name for `luxafor-toggle <id>` (lowercase letters, digits, `-`, `_`; `off` is reserved);
-- **color** — a color name (`red`, `orange`, `purple`…) or a hex code (`#ff8800`);
+- **color** — a hex code (`#ff8800` or short `#f80`) or a color name: `red`, `orange`,
+  `darkorange`, `gold`, `yellow`, `lime`, `green`, `springgreen`, `cyan`, `teal`,
+  `skyblue`, `blue`, `royalblue`, `navy`, `purple`, `violet`, `magenta`, `pink`,
+  `hotpink`, `crimson`, `coral`, `white`… (CSS names — `green` is CSS green, a darker
+  green; use `lime` for full green);
 - **label** — what you see in menus and notifications; any language, spaces allowed.
 
 Add as many statuses as you like. The dock button cycles through them in file
@@ -106,18 +117,29 @@ Your configuration is kept when you re-run `./install.sh`.
 
 | Problem | Fix |
 |---|---|
-| "could not reach the light" notification | Unplug/replug the light, then run `busylight list`. |
-| "could not set color" notification | Check the color in your `statuses.conf` — try a hex code like `#ff8800`. |
+| "no Luxafor light found" notification | Unplug/replug the light, then run `luxafor-light list`. |
+| "cannot write to /dev/hidraw…" | The udev rule isn't active: re-run `./install.sh`, then unplug/replug the light. |
+| "unknown color" notification | Check the color in your `statuses.conf` — try a hex code like `#ff8800`. |
 | A status is missing from the menu | Run `luxafor-toggle --list`: invalid lines in `statuses.conf` are reported there. |
-| `busylight list` shows nothing | Run `lsusb \| grep -i 04d8`. If the light is listed, it's the udev rule — re-run `./install.sh` and replug. |
+| `luxafor-light list` shows nothing | Run `lsusb \| grep -i 04d8`. If your light shows a different ID than `04d8:f372`, please open an issue — it's probably a model that isn't supported yet. |
 | No tray icon | Make sure the "System Tray" applet is on your panel. On GNOME, install the *AppIndicator Support* extension. |
 | `luxafor-toggle: command not found` | Log out and back in so `~/.local/bin` is on your `PATH`. |
+
+## Upgrading from an earlier version
+
+Versions before the built-in driver used `busylight-for-humans`. Once the new
+version works, you can remove it:
+
+```bash
+pipx uninstall busylight-for-humans
+sudo rm -f /etc/udev/rules.d/99-busylights.rules
+```
 
 ## Uninstall
 
 ```bash
 ./uninstall.sh         # removes scripts, launchers and icons
-./uninstall.sh --all   # also removes your statuses, busylight-for-humans and the udev rule
+./uninstall.sh --all   # also removes your statuses and the udev rule
 ```
 
 ## Contributing
@@ -134,7 +156,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 
 ## Credits
 
-- [busylight-for-humans](https://github.com/JnyJny/busylight) by Erik O'Shaughnessy — the driver doing the actual work.
+- Luxafor, for publishing the HID protocol of their lights.
+- [busylight-for-humans](https://github.com/JnyJny/busylight) by Erik O'Shaughnessy, which powered the first versions of this project.
 
 ## License
 

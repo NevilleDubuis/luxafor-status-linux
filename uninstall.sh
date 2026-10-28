@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Uninstalls luxafor-status.
 # Usage: ./uninstall.sh [--all]
-#   --all  also removes your status configuration, busylight-for-humans and the udev rule
+#   --all  also removes your status configuration and the udev rule
 set -euo pipefail
 
 BINDIR="$HOME/.local/bin"
@@ -13,9 +13,9 @@ ALL=0
 [ "${1:-}" = "--all" ] && ALL=1
 
 pkill -f "$BINDIR/luxafor-tray" >/dev/null 2>&1 || true
-if command -v busylight >/dev/null 2>&1; then busylight off >/dev/null 2>&1 || true; fi
+[ -x "$BINDIR/luxafor-light" ] && "$BINDIR/luxafor-light" off >/dev/null 2>&1 || true
 
-rm -f  "$BINDIR/luxafor-toggle" "$BINDIR/luxafor-tray"
+rm -f  "$BINDIR/luxafor-light" "$BINDIR/luxafor-toggle" "$BINDIR/luxafor-tray"
 rm -f  "$DATA_HOME/applications/luxafor.desktop"
 rm -f  "$DATA_HOME/icons/hicolor/scalable/apps/luxafor-status.svg"
 rm -f  "$DATA_HOME"/icons/lxftray-*.svg
@@ -28,11 +28,8 @@ echo "✓ luxafor-status uninstalled"
 if [ "$ALL" -eq 1 ]; then
     rm -rf "$CONFIG_HOME/luxafor-status"
     echo "✓ status configuration removed"
-    if pipx uninstall busylight-for-humans >/dev/null 2>&1; then
-        echo "✓ busylight-for-humans uninstalled"
-    fi
-    if [ -f /etc/udev/rules.d/99-busylights.rules ]; then
-        sudo rm -f /etc/udev/rules.d/99-busylights.rules
+    if [ -f /etc/udev/rules.d/70-luxafor-status.rules ]; then
+        sudo rm -f /etc/udev/rules.d/70-luxafor-status.rules
         sudo udevadm control --reload-rules
         echo "✓ udev rule removed"
     fi
