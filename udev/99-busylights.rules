@@ -1,5 +1,5 @@
-# Règle de secours si « busylight udev-rules » n'est pas disponible.
-# Donne à l'utilisateur connecté l'accès aux lampes Luxafor qui utilisent l'ID USB 04d8:f372.
-# Vérifie l'ID de ta lampe avec : lsusb | grep -i 04d8
+# Fallback rule, used only if "busylight udev-rules" is not available.
+# Gives the logged-in user access to Luxafor lights with USB ID 04d8:f372.
+# Check your light's ID with: lsusb | grep -i 04d8
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="f372", TAG+="uaccess", MODE="0660"
 KERNEL=="hidraw*", ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="f372", TAG+="uaccess", MODE="0660"

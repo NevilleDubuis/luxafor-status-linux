@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Luxafor Tray
-Comment=Affiche le statut de la Luxafor dans la zone de notification
+Comment=Shows the Luxafor status in the system tray
 Exec=@BINDIR@/luxafor-tray
 Icon=luxafor
 Terminal=false

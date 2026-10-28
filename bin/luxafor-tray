@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""luxafor-tray — icône dans la zone de notification qui affiche
-la couleur actuelle de la Luxafor et permet de changer de statut."""
+"""luxafor-tray — system tray icon showing the current Luxafor status,
+with a menu to change it. Statuses come from the same configuration
+file as luxafor-toggle and are reloaded automatically when it changes."""
 import os
+import re
 import shutil
 import subprocess
 
@@ -14,64 +16,112 @@ from gi.repository import GLib, Gtk  # noqa: E402
 
 HOME = os.path.expanduser("~")
 DATA_HOME = os.environ.get("XDG_DATA_HOME", f"{HOME}/.local/share")
+CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME", f"{HOME}/.config")
 CACHE_HOME = os.environ.get("XDG_CACHE_HOME", f"{HOME}/.cache")
 
 TOGGLE = shutil.which("luxafor-toggle") or f"{HOME}/.local/bin/luxafor-toggle"
+CONF = f"{CONFIG_HOME}/luxafor-status/statuses.conf"
+DEFAULT_CONF = f"{DATA_HOME}/luxafor-status/statuses.conf"
 STATE = f"{CACHE_HOME}/luxafor-state"
 ICON_DIR = f"{DATA_HOME}/luxafor-status/icons"
 
-LABELS = {
-    "green": "Disponible",
-    "red": "Occupé",
-    "yellow": "En appel",
-    "off": "Éteint",
-}
+ID_RE = re.compile(r"^[a-z0-9_-]+$")
+FALLBACK = [("available", "Available"), ("busy", "Busy"), ("call", "On a call")]
+
+
+def config_path():
+    return CONF if os.path.isfile(CONF) else DEFAULT_CONF
+
+
+def config_mtime():
+    try:
+        return os.path.getmtime(config_path())
+    except OSError:
+        return None
+
+
+def load_statuses():
+    """Returns [(id, label), …] — same rules as luxafor-toggle."""
+    statuses = []
+    try:
+        with open(config_path(), encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = [p.strip() for p in line.split("|", 2)]
+                if len(parts) < 2 or not parts[1]:
+                    continue
+                sid = parts[0]
+                if not ID_RE.match(sid) or sid == "off":
+                    continue
+                label = parts[2] if len(parts) > 2 and parts[2] else sid
+                statuses.append((sid, label))
+    except OSError:
+        pass
+    return statuses or FALLBACK
 
 
 def read_state():
     try:
         with open(STATE) as f:
-            s = f.read().strip()
-            return s if s in LABELS else "off"
+            return f.read().strip() or "off"
     except OSError:
         return "off"
 
 
-def set_status(key):
-    subprocess.Popen([TOGGLE, key])
+class Tray:
+    def __init__(self):
+        self.ind = AI.Indicator.new(
+            "luxafor-status", "luxafor-off", AI.IndicatorCategory.APPLICATION_STATUS
+        )
+        self.ind.set_status(AI.IndicatorStatus.ACTIVE)
+        self.ind.set_title("Luxafor")
+        self.statuses = []
+        self.mtime = object()  # forces a first load
+        self.last_state = None
+        self.tick()
+        GLib.timeout_add_seconds(1, self.tick)
+
+    def reload(self):
+        # luxafor-toggle regenerates the icons and the launcher actions.
+        subprocess.run([TOGGLE, "--reload"], stdout=subprocess.DEVNULL, check=False)
+        self.ind.set_icon_theme_path(ICON_DIR)
+        self.statuses = load_statuses()
+        self.build_menu()
+        self.last_state = None  # icons may have changed color
+
+    def build_menu(self):
+        menu = Gtk.Menu()
+        for sid, label in self.statuses + [("off", "Off")]:
+            item = Gtk.MenuItem(label=label)
+            item.connect("activate", lambda _w, s=sid: subprocess.Popen([TOGGLE, s]))
+            menu.append(item)
+        menu.append(Gtk.SeparatorMenuItem())
+        edit = Gtk.MenuItem(label="Edit statuses…")
+        edit.connect("activate", lambda _w: subprocess.Popen([TOGGLE, "--edit"]))
+        menu.append(edit)
+        quit_item = Gtk.MenuItem(label="Quit tray icon")
+        quit_item.connect("activate", lambda _w: Gtk.main_quit())
+        menu.append(quit_item)
+        menu.show_all()
+        self.ind.set_menu(menu)
+
+    def tick(self):
+        mtime = config_mtime()
+        if mtime != self.mtime:
+            self.mtime = mtime
+            self.reload()
+        state = read_state()
+        known = {sid: label for sid, label in self.statuses}
+        if state not in known:
+            state = "off"
+        if state != self.last_state:
+            self.ind.set_icon_full(f"luxafor-{state}", known.get(state, "Off"))
+            self.last_state = state
+        return True
 
 
-ind = AI.Indicator.new(
-    "luxafor-status", "luxafor-off", AI.IndicatorCategory.APPLICATION_STATUS
-)
-ind.set_icon_theme_path(ICON_DIR)
-ind.set_status(AI.IndicatorStatus.ACTIVE)
-ind.set_title("Luxafor")
-
-menu = Gtk.Menu()
-for key, label in LABELS.items():
-    item = Gtk.MenuItem(label=label)
-    item.connect("activate", lambda _w, k=key: set_status(k))
-    menu.append(item)
-menu.append(Gtk.SeparatorMenuItem())
-quit_item = Gtk.MenuItem(label="Quitter l'icône")
-quit_item.connect("activate", lambda _w: Gtk.main_quit())
-menu.append(quit_item)
-menu.show_all()
-ind.set_menu(menu)
-
-_last = None
-
-
-def refresh():
-    global _last
-    s = read_state()
-    if s != _last:
-        ind.set_icon_full(f"luxafor-{s}", LABELS[s])
-        _last = s
-    return True
-
-
-refresh()
-GLib.timeout_add_seconds(1, refresh)
-Gtk.main()
+if __name__ == "__main__":
+    Tray()
+    Gtk.main()
