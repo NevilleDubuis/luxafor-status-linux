@@ -2,6 +2,8 @@
 """luxafor-tray — system tray icon showing the current Luxafor status,
 with a menu to change it. Statuses come from the same configuration
 file as luxafor-toggle and are reloaded automatically when it changes."""
+import glob
+import hashlib
 import os
 import re
 import shutil
@@ -23,10 +25,26 @@ TOGGLE = shutil.which("luxafor-toggle") or f"{HOME}/.local/bin/luxafor-toggle"
 CONF = f"{CONFIG_HOME}/luxafor-status/statuses.conf"
 DEFAULT_CONF = f"{DATA_HOME}/luxafor-status/statuses.conf"
 STATE = f"{CACHE_HOME}/luxafor-state"
-ICON_DIR = f"{DATA_HOME}/luxafor-status/icons"
+
+# Tray icons go straight into ~/.local/share/icons: every icon lookup
+# (GTK and system tray hosts such as Budgie's) searches that folder.
+# File names include a hash of the color, so a color change gives a new
+# name and tray hosts can't keep showing a cached, outdated icon.
+TRAY_ICON_DIR = f"{DATA_HOME}/icons"
+TRAY_ICON_PREFIX = "luxafor-tray-"
+OFF_COLOR = "#9e9e9e"
 
 ID_RE = re.compile(r"^[a-z0-9_-]+$")
-FALLBACK = [("available", "Available"), ("busy", "Busy"), ("call", "On a call")]
+FALLBACK = [
+    ("available", "green", "Available"),
+    ("busy", "red", "Busy"),
+    ("call", "yellow", "On a call"),
+]
+
+SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+    '<circle cx="32" cy="32" r="26" fill="{color}"/></svg>\n'
+)
 
 
 def config_path():
@@ -41,7 +59,7 @@ def config_mtime():
 
 
 def load_statuses():
-    """Returns [(id, label), …] — same rules as luxafor-toggle."""
+    """Returns [(id, color, label), …] — same rules as luxafor-toggle."""
     statuses = []
     try:
         with open(config_path(), encoding="utf-8") as f:
@@ -52,11 +70,11 @@ def load_statuses():
                 parts = [p.strip() for p in line.split("|", 2)]
                 if len(parts) < 2 or not parts[1]:
                     continue
-                sid = parts[0]
+                sid, color = parts[0], parts[1]
                 if not ID_RE.match(sid) or sid == "off":
                     continue
                 label = parts[2] if len(parts) > 2 and parts[2] else sid
-                statuses.append((sid, label))
+                statuses.append((sid, color, label))
     except OSError:
         pass
     return statuses or FALLBACK
@@ -70,30 +88,55 @@ def read_state():
         return "off"
 
 
+def write_tray_icons(statuses):
+    """Writes one icon per status and returns {id: icon name}."""
+    os.makedirs(TRAY_ICON_DIR, exist_ok=True)
+    for old in glob.glob(f"{TRAY_ICON_DIR}/{TRAY_ICON_PREFIX}*.svg"):
+        try:
+            os.remove(old)
+        except OSError:
+            pass
+    names = {}
+    for sid, color, _label in statuses + [("off", OFF_COLOR, "Off")]:
+        digest = hashlib.md5(color.encode()).hexdigest()[:6]
+        name = f"{TRAY_ICON_PREFIX}{sid}-{digest}"
+        with open(f"{TRAY_ICON_DIR}/{name}.svg", "w") as f:
+            f.write(SVG.format(color=color))
+        names[sid] = name
+    return names
+
+
 class Tray:
     def __init__(self):
         self.ind = AI.Indicator.new(
-            "luxafor-status", "luxafor-off", AI.IndicatorCategory.APPLICATION_STATUS
+            "luxafor-status", "luxafor", AI.IndicatorCategory.APPLICATION_STATUS
         )
+        self.ind.set_icon_theme_path(TRAY_ICON_DIR)
         self.ind.set_status(AI.IndicatorStatus.ACTIVE)
         self.ind.set_title("Luxafor")
         self.statuses = []
+        self.icons = {}
         self.mtime = object()  # forces a first load
         self.last_state = None
         self.tick()
         GLib.timeout_add_seconds(1, self.tick)
 
     def reload(self):
-        # luxafor-toggle regenerates the icons and the launcher actions.
-        subprocess.run([TOGGLE, "--reload"], stdout=subprocess.DEVNULL, check=False)
-        self.ind.set_icon_theme_path(ICON_DIR)
+        # luxafor-toggle refreshes the dock launcher and notification icons.
+        subprocess.run(
+            [TOGGLE, "--reload"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
         self.statuses = load_statuses()
+        self.icons = write_tray_icons(self.statuses)
         self.build_menu()
-        self.last_state = None  # icons may have changed color
+        self.last_state = None  # force the icon to be set again
 
     def build_menu(self):
         menu = Gtk.Menu()
-        for sid, label in self.statuses + [("off", "Off")]:
+        for sid, _color, label in self.statuses + [("off", OFF_COLOR, "Off")]:
             item = Gtk.MenuItem(label=label)
             item.connect("activate", lambda _w, s=sid: subprocess.Popen([TOGGLE, s]))
             menu.append(item)
@@ -113,11 +156,11 @@ class Tray:
             self.mtime = mtime
             self.reload()
         state = read_state()
-        known = {sid: label for sid, label in self.statuses}
-        if state not in known:
+        if state not in self.icons:
             state = "off"
         if state != self.last_state:
-            self.ind.set_icon_full(f"luxafor-{state}", known.get(state, "Off"))
+            label = next((l for s, _c, l in self.statuses if s == state), "Off")
+            self.ind.set_icon_full(self.icons[state], label)
             self.last_state = state
         return True
 
