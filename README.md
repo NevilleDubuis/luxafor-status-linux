@@ -32,7 +32,7 @@ open an issue or a PR to report whether it works — even a quick "works for me"
 ## Installation
 
 ```bash
-git clone https://github.com/NevilleDubuis/luxafor-status-.git
+git clone https://github.com/NevilleDubuis/luxafor-status-.git luxafor-status
 cd luxafor-status
 ./install.sh
 ```
