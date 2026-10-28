@@ -1,0 +1,7 @@
+# luxafor-status — lets the logged-in user drive Luxafor lights without sudo.
+#
+# The number must stay below 73: the "uaccess" tag is applied by
+# systemd's 73-seat-late.rules.
+#
+# To add another model, copy the line with its IDs (lsusb | grep -i 04d8).
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="f372", TAG+="uaccess"
