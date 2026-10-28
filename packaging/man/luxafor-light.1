@@ -1,0 +1,45 @@
+.TH LUXAFOR-LIGHT 1 "" "luxafor-status" "User Commands"
+.SH NAME
+luxafor-light \- set the color of a Luxafor USB status light
+.SH SYNOPSIS
+.B luxafor-light
+.I color
+.br
+.B luxafor-light off
+.br
+.B luxafor-light list
+.SH DESCRIPTION
+.B luxafor-light
+drives Luxafor lights (ORB, Flag) directly through their USB HID protocol,
+by writing to the light's
+.I /dev/hidraw*
+device. Every connected light is set to the same color.
+.PP
+.I color
+is a hex code
+.RI ( #ff8800 " or " #f80 )
+or a CSS color name such as
+.BR red ", " orange ", " yellow ", " lime ", " green ", " blue ", " purple .
+.SH COMMANDS
+.TP
+.B off
+Turn the light off.
+.TP
+.B list
+List connected Luxafor lights.
+.SH ENVIRONMENT
+.TP
+.B LUXAFOR_IDS
+Space-separated USB
+.IR vendor : product
+IDs to look for (default: 04d8:f372).
+.SH FILES
+.TP
+.I /usr/lib/udev/rules.d/70-luxafor-status.rules
+Gives the logged-in user access to the light without sudo.
+.SH EXIT STATUS
+0 on success, 1 if no light was found or it could not be written to,
+2 for an unknown color.
+.SH SEE ALSO
+.BR luxafor-toggle (1),
+.BR luxafor-tray (1)

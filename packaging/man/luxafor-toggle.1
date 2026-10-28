@@ -1,0 +1,67 @@
+.TH LUXAFOR-TOGGLE 1 "" "luxafor-status" "User Commands"
+.SH NAME
+luxafor-toggle \- set or cycle the status shown by a Luxafor light
+.SH SYNOPSIS
+.B luxafor-toggle
+.RI [ id " | " off ]
+.br
+.B luxafor-toggle
+.RB [ \-\-list " | " \-\-current " | " \-\-edit " | " \-\-reload ]
+.SH DESCRIPTION
+Without arguments,
+.B luxafor-toggle
+moves to the next status, in the order of the configuration file, then off.
+With a status
+.IR id ,
+it sets that status. A desktop notification shows the new status.
+.SH OPTIONS
+.TP
+.B \-\-list
+List the configured statuses.
+.TP
+.B \-\-current
+Print the id of the current status.
+.TP
+.B \-\-edit
+Open the status configuration in an editor (created from the defaults
+if needed).
+.TP
+.B \-\-reload
+Regenerate the status icons and the launcher's right-click actions after
+editing the configuration by hand.
+.SH CONFIGURATION
+One status per line, as
+.IR "id " | " color " | " label" :
+.PP
+.nf
+.RS
+available | green   | Available
+busy      | red     | Busy
+focus     | #0000ff | Focus \(em do not disturb
+.RE
+.fi
+.PP
+.I id
+uses lowercase letters, digits,
+.BR \- " and " _ ;
+.B off
+is reserved.
+.I color
+is anything
+.BR luxafor-light (1)
+accepts.
+.I label
+is shown in menus and notifications.
+.SH FILES
+.TP
+.I ~/.config/luxafor-status/statuses.conf
+Your statuses.
+.TP
+.I /usr/share/luxafor-status/statuses.conf
+Default statuses, used when you have none.
+.TP
+.I ~/.cache/luxafor-state
+The current status.
+.SH SEE ALSO
+.BR luxafor-light (1),
+.BR luxafor-tray (1)

@@ -1,0 +1,43 @@
+name: Release
+
+# Push a version tag to publish a release with the .deb attached:
+#   git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lintian desktop-file-utils
+
+      - name: Tests
+        run: tests/run.sh
+
+      - name: Build .deb
+        run: packaging/build-deb.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Lintian
+        run: lintian --pedantic --fail-on error,warning dist/*.deb
+
+      - name: Install the package
+        run: |
+          sudo apt-get install -y ./dist/*.deb
+          luxafor-toggle --list
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.deb \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """luxafor-tray — system tray icon showing the current Luxafor status,
 with a menu to change it. Statuses come from the same configuration
 file as luxafor-toggle and are reloaded automatically when it changes."""
@@ -21,9 +21,26 @@ DATA_HOME = os.environ.get("XDG_DATA_HOME", f"{HOME}/.local/share")
 CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME", f"{HOME}/.config")
 CACHE_HOME = os.environ.get("XDG_CACHE_HOME", f"{HOME}/.cache")
 
-TOGGLE = shutil.which("luxafor-toggle") or f"{HOME}/.local/bin/luxafor-toggle"
+# Prefer the luxafor-toggle installed next to this script (per-user or package).
+_HERE = os.path.dirname(os.path.realpath(__file__))
+TOGGLE = (
+    f"{_HERE}/luxafor-toggle"
+    if os.path.isfile(f"{_HERE}/luxafor-toggle")
+    else shutil.which("luxafor-toggle") or f"{HOME}/.local/bin/luxafor-toggle"
+)
 CONF = f"{CONFIG_HOME}/luxafor-status/statuses.conf"
-DEFAULT_CONF = f"{DATA_HOME}/luxafor-status/statuses.conf"
+# Default statuses: per-user install (~/.local/share) or package (/usr/share).
+DATA_DIRS = [DATA_HOME] + os.environ.get(
+    "XDG_DATA_DIRS", "/usr/local/share:/usr/share"
+).split(":")
+DEFAULT_CONF = next(
+    (
+        f"{d}/luxafor-status/statuses.conf"
+        for d in DATA_DIRS
+        if d and os.path.isfile(f"{d}/luxafor-status/statuses.conf")
+    ),
+    f"{DATA_HOME}/luxafor-status/statuses.conf",
+)
 STATE = f"{CACHE_HOME}/luxafor-state"
 
 # Tray icons go straight into ~/.local/share/icons: every icon lookup

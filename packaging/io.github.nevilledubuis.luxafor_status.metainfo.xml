@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.nevilledubuis.luxafor_status</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Luxafor Status</name>
+  <summary>Control a Luxafor status light from your desktop</summary>
+  <description>
+    <p>
+      Set the color of a Luxafor USB status light (ORB, Flag) from a dock
+      launcher, a system tray icon that shows the current status, or the
+      command line.
+    </p>
+    <p>
+      Statuses are configurable: as many as you like, with your own names
+      and colors.
+    </p>
+  </description>
+  <launchable type="desktop-id">luxafor.desktop</launchable>
+  <url type="homepage">https://github.com/NevilleDubuis/luxafor-status-linux</url>
+  <url type="bugtracker">https://github.com/NevilleDubuis/luxafor-status-linux/issues</url>
+  <developer id="io.github.nevilledubuis">
+    <name>Néville Dubuis</name>
+  </developer>
+  <provides>
+    <modalias>usb:v04D8pF372d*</modalias>
+    <binary>luxafor-light</binary>
+    <binary>luxafor-toggle</binary>
+    <binary>luxafor-tray</binary>
+  </provides>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+</component>

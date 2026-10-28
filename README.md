@@ -1,5 +1,8 @@
 # luxafor-status-linux
 
+[![CI](https://github.com/NevilleDubuis/luxafor-status-linux/actions/workflows/ci.yml/badge.svg)](https://github.com/NevilleDubuis/luxafor-status-linux/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/NevilleDubuis/luxafor-status-linux)](https://github.com/NevilleDubuis/luxafor-status-linux/releases/latest)
+
 Control a **Luxafor** status light from Ubuntu, with:
 
 - 🖱️ **a dock button** — click to cycle through statuses, right-click to pick one;
@@ -31,6 +34,24 @@ open an issue or a PR to report whether it works — even a quick "works for me"
 
 ## Installation
 
+### Debian package (recommended)
+
+Download the latest `.deb` from the
+[releases page](https://github.com/NevilleDubuis/luxafor-status-linux/releases/latest),
+then:
+
+```bash
+sudo apt install ./luxafor-status_*_all.deb
+```
+
+`apt` installs the dependencies, the udev rule and the launcher, and starts the
+tray icon at your next login (or run `luxafor-tray &` right away). To remove it:
+`sudo apt remove luxafor-status`.
+
+### From source
+
+For other distributions, or to try the latest changes:
+
 ```bash
 git clone https://github.com/NevilleDubuis/luxafor-status-linux.git
 cd luxafor-status-linux
@@ -44,13 +65,17 @@ The installer:
 3. copies the scripts to `~/.local/bin`, adds the launcher to the app menu, and starts the tray icon at login.
 
 It only asks for your `sudo` password for steps 1 and 2.
-**Unplug and replug the light** after the first install.
+If the light doesn't respond right away, unplug and replug it.
+
+> [!NOTE]
+> Use one method or the other. If you switch from the source install to the
+> package, run `./uninstall.sh` first.
 
 Options:
 
 | Option           | Effect                                         |
 |------------------|------------------------------------------------|
-| `--no-deps`      | don't touch apt packages or pipx               |
+| `--no-deps`      | don't install apt packages                     |
 | `--no-udev`      | don't install the udev rule                    |
 | `--no-autostart` | don't start the tray icon at login             |
 
