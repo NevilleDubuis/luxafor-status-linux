@@ -1,0 +1,20 @@
+.TH LUXAFOR-TRAY 1 "" "luxafor-status" "User Commands"
+.SH NAME
+luxafor-tray \- system tray icon showing the Luxafor status
+.SH SYNOPSIS
+.B luxafor-tray
+.SH DESCRIPTION
+.B luxafor-tray
+shows a dot in the system tray with the color of the current status.
+Its menu sets a status, opens the status configuration, or quits the icon.
+.PP
+It follows changes made by
+.BR luxafor-toggle (1)
+from anywhere (launcher, keyboard shortcut, terminal) and reloads the
+configuration when the file is saved.
+.PP
+It is started at login through
+.IR /etc/xdg/autostart/luxafor-tray.desktop .
+.SH SEE ALSO
+.BR luxafor-light (1),
+.BR luxafor-toggle (1)

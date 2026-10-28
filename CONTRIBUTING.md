@@ -22,15 +22,38 @@ Running `luxafor-toggle` from a terminal usually prints a useful error message.
 
 1. Fork the repository and create a branch.
 2. Keep changes small and focused — one topic per pull request.
-3. Check your shell scripts with [ShellCheck](https://www.shellcheck.net/):
+3. Run the checks — CI runs the same ones on every pull request:
 
    ```bash
-   shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle
+   tests/run.sh                 # driver and statuses, no light needed
+   shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle \
+              packaging/build-deb.sh tests/run.sh
    python3 -m py_compile bin/luxafor-tray
    ```
 
 4. Test `./install.sh` and `./uninstall.sh` on your machine if you touched them.
 5. Open a pull request explaining what and why.
+
+## Building the package
+
+```bash
+packaging/build-deb.sh 0.1.0       # → dist/luxafor-status_0.1.0_all.deb
+lintian --pedantic dist/*.deb      # should print nothing
+```
+
+It only needs `dpkg-deb` (no debhelper). The package installs to `/usr`, puts
+the udev rule in `/usr/lib/udev/rules.d` and starts the tray icon through
+`/etc/xdg/autostart`.
+
+## Releasing
+
+Push a version tag; the *Release* workflow tests, builds and publishes a GitHub
+release with the `.deb` attached:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
 
 ## Project layout
 
@@ -43,8 +66,11 @@ share/statuses.conf    default status configuration
 share/icons/           application icon (luxafor-status)
 share/applications/    tray autostart template (@BINDIR@ is replaced at install time)
 udev/                  udev rule granting the logged-in user access to the light
-install.sh             per-user installer
-uninstall.sh           uninstaller
+install.sh             per-user installer (from source)
+uninstall.sh           uninstaller for the per-user install
+packaging/             .deb build script, man pages, AppStream metadata
+tests/run.sh           tests with a fake light
+.github/workflows/     CI (checks + package build) and releases
 ```
 
 Runtime files:

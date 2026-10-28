@@ -13,7 +13,7 @@ ALL=0
 [ "${1:-}" = "--all" ] && ALL=1
 
 pkill -f "$BINDIR/luxafor-tray" >/dev/null 2>&1 || true
-[ -x "$BINDIR/luxafor-light" ] && "$BINDIR/luxafor-light" off >/dev/null 2>&1 || true
+if [ -x "$BINDIR/luxafor-light" ]; then "$BINDIR/luxafor-light" off >/dev/null 2>&1 || true; fi
 
 rm -f  "$BINDIR/luxafor-light" "$BINDIR/luxafor-toggle" "$BINDIR/luxafor-tray"
 rm -f  "$DATA_HOME/applications/luxafor.desktop"

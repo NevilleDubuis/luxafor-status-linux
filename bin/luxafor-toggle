@@ -15,7 +15,18 @@ CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
 CONF="$CONFIG_HOME/luxafor-status/statuses.conf"
-DEFAULT_CONF="$DATA_HOME/luxafor-status/statuses.conf"
+# Default statuses: per-user install (~/.local/share) or package (/usr/share).
+find_default_conf() {
+    local d IFS=:
+    # shellcheck disable=SC2086  # split XDG_DATA_DIRS on ":"
+    for d in "$DATA_HOME" ${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
+        if [ -f "$d/luxafor-status/statuses.conf" ]; then
+            echo "$d/luxafor-status/statuses.conf"; return
+        fi
+    done
+    echo "$DATA_HOME/luxafor-status/statuses.conf"
+}
+DEFAULT_CONF="$(find_default_conf)"
 STATE="$CACHE_HOME/luxafor-state"
 ICON_DIR="$DATA_HOME/luxafor-status/icons"
 DESKTOP_FILE="$DATA_HOME/applications/luxafor.desktop"
@@ -27,7 +38,7 @@ trim() { local s="$1"; s="${s#"${s%%[![:space:]]*}"}"; printf '%s' "${s%"${s##*[
 
 notify() {
     command -v notify-send >/dev/null 2>&1 || return 0
-    notify-send -t 1500 -i "${2:-luxafor-status}" "Luxafor" "$1"
+    notify-send -t 1500 -i "${2:-luxafor-status}" "Luxafor" "$1" 2>/dev/null || true
 }
 
 die() { echo "luxafor-toggle: $1" >&2; notify "$1"; exit "${2:-1}"; }

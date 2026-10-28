@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck lintian appstream desktop-file-utils \
+            python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1
+
+      - name: ShellCheck
+        run: shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle packaging/build-deb.sh tests/run.sh
+
+      - name: Python
+        run: |
+          python3 -m py_compile bin/luxafor-tray
+          # Load the tray with the real GTK / AppIndicator bindings (no main loop).
+          /usr/bin/python3 - <<'EOF'
+          src = open("bin/luxafor-tray").read().replace('if __name__ == "__main__":', "if False:")
+          exec(compile(src, "luxafor-tray", "exec"), {"__file__": "bin/luxafor-tray", "__name__": "tray"})
+          EOF
+
+      - name: Tests
+        run: tests/run.sh
+
+      - name: Build .deb
+        run: packaging/build-deb.sh "0.0.0~ci${GITHUB_RUN_NUMBER}"
+
+      - name: Lintian
+        run: lintian --pedantic --fail-on error,warning dist/*.deb
+
+      - name: AppStream
+        run: appstreamcli validate --no-net packaging/*.metainfo.xml
+
+      - name: Install the package
+        run: |
+          sudo apt-get install -y ./dist/*.deb
+          luxafor-toggle --list
+          sudo apt-get purge -y luxafor-status
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: luxafor-status-deb
+          path: dist/*.deb
