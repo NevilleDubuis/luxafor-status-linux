@@ -39,7 +39,7 @@ bin/luxafor-toggle     sets or cycles the status (calls `busylight`), and genera
                        the status icons and the dock launcher (--reload)
 bin/luxafor-tray       tray icon showing the current status (Python + AppIndicator)
 share/statuses.conf    default status configuration
-share/icons/           application icon
+share/icons/           application icon (luxafor-status)
 share/applications/    tray autostart template (@BINDIR@ is replaced at install time)
 udev/                  fallback udev rule
 install.sh             per-user installer
@@ -55,10 +55,12 @@ Runtime files:
   (and the config file's modification time) every second, so any tool that
   calls `luxafor-toggle` keeps the tray in sync.
 - `~/.local/share/luxafor-status/icons/` — one generated SVG per status (notifications).
-- `~/.local/share/icons/luxafor-tray-<id>-<hash>.svg` — tray icons, written by
+- `~/.local/share/icons/lxftray-<id>-<hash>.svg` — tray icons, written by
   `luxafor-tray`. They live in the standard icon folder because some tray hosts
   (e.g. Budgie) ignore the indicator's custom icon path; the color hash in the
   name prevents hosts from showing a cached icon after a color change.
+  The prefix deliberately shares nothing with other icon names — see the
+  comment in `bin/luxafor-tray` (GTK generic fallback).
 
 ## Code of conduct
 

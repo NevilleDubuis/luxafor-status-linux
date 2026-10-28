@@ -17,8 +17,8 @@ if command -v busylight >/dev/null 2>&1; then busylight off >/dev/null 2>&1 || t
 
 rm -f  "$BINDIR/luxafor-toggle" "$BINDIR/luxafor-tray"
 rm -f  "$DATA_HOME/applications/luxafor.desktop"
-rm -f  "$DATA_HOME/icons/hicolor/scalable/apps/luxafor.svg"
-rm -f  "$DATA_HOME"/icons/luxafor-tray-*.svg
+rm -f  "$DATA_HOME/icons/hicolor/scalable/apps/luxafor-status.svg"
+rm -f  "$DATA_HOME"/icons/lxftray-*.svg
 rm -rf "$DATA_HOME/luxafor-status"
 rm -f  "$CONFIG_HOME/autostart/luxafor-tray.desktop"
 rm -f  "$CACHE_HOME/luxafor-state"

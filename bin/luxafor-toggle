@@ -27,7 +27,7 @@ trim() { local s="$1"; s="${s#"${s%%[![:space:]]*}"}"; printf '%s' "${s%"${s##*[
 
 notify() {
     command -v notify-send >/dev/null 2>&1 || return 0
-    notify-send -t 1500 -i "${2:-luxafor}" "Luxafor" "$1"
+    notify-send -t 1500 -i "${2:-luxafor-status}" "Luxafor" "$1"
 }
 
 die() { echo "luxafor-toggle: $1" >&2; notify "$1"; exit "${2:-1}"; }
@@ -89,7 +89,7 @@ reload() {
         echo "Name=Luxafor"
         echo "Comment=Change the Luxafor light status"
         echo "Exec=$BINDIR/luxafor-toggle"
-        echo "Icon=luxafor"
+        echo "Icon=luxafor-status"
         echo "Terminal=false"
         echo "Categories=Utility;"
         echo "Keywords=luxafor;busylight;status;"
@@ -181,5 +181,5 @@ mkdir -p "$(dirname "$STATE")"
 echo "$NEXT" > "$STATE"
 
 ICON="$ICON_DIR/luxafor-$NEXT.svg"
-[ -f "$ICON" ] || ICON=luxafor
+[ -f "$ICON" ] || ICON=luxafor-status
 notify "$LABEL" "$ICON"

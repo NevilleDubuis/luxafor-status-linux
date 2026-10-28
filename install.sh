@@ -86,7 +86,10 @@ mkdir -p "$BINDIR" "$SHAREDIR" "$APPICONDIR"
 
 install -m 0755 "$SRC/bin/luxafor-toggle" "$BINDIR/luxafor-toggle"
 install -m 0755 "$SRC/bin/luxafor-tray"   "$BINDIR/luxafor-tray"
-install -m 0644 "$SRC/share/icons/luxafor.svg" "$APPICONDIR/luxafor.svg"
+install -m 0644 "$SRC/share/icons/luxafor-status.svg" "$APPICONDIR/luxafor-status.svg"
+# Clean up icons from previous versions. An app icon named "luxafor" made
+# Budgie's tray show it instead of the status color (see bin/luxafor-tray).
+rm -f "$APPICONDIR/luxafor.svg" "$DATA_HOME"/icons/luxafor-tray-*.svg
 install -m 0644 "$SRC/share/statuses.conf" "$SHAREDIR/statuses.conf"
 gtk-update-icon-cache -q "$DATA_HOME/icons/hicolor" >/dev/null 2>&1 || true
 ok "scripts in $BINDIR"
