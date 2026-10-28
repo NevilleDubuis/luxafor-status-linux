@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Luxafor Tray
+Comment=Affiche le statut de la Luxafor dans la zone de notification
+Exec=@BINDIR@/luxafor-tray
+Icon=luxafor
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

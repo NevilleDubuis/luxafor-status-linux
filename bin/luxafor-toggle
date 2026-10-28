@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# luxafor-toggle — change le statut de la Luxafor.
+#   luxafor-toggle            fait défiler : éteint → vert → rouge → jaune → éteint
+#   luxafor-toggle <statut>   green | red | yellow | off
+set -u
+
+STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}"
+STATE="$STATE_DIR/luxafor-state"
+mkdir -p "$STATE_DIR"
+
+BL="$(command -v busylight || true)"
+[ -z "$BL" ] && [ -x "$HOME/.local/bin/busylight" ] && BL="$HOME/.local/bin/busylight"
+
+notify() {
+    command -v notify-send >/dev/null 2>&1 && notify-send -t 1500 -i luxafor "Luxafor" "$1"
+}
+
+if [ -z "$BL" ]; then
+    notify "busylight introuvable — relance install.sh"
+    echo "Erreur : la commande 'busylight' est introuvable." >&2
+    exit 1
+fi
+
+case "${1:-}" in
+    green|red|yellow|off) NEXT="$1" ;;
+    "")
+        CUR="$(cat "$STATE" 2>/dev/null || echo off)"
+        case "$CUR" in
+            off)    NEXT=green ;;
+            green)  NEXT=red ;;
+            red)    NEXT=yellow ;;
+            *)      NEXT=off ;;
+        esac ;;
+    *)
+        echo "Usage : $(basename "$0") [green|red|yellow|off]" >&2
+        exit 2 ;;
+esac
+
+if [ "$NEXT" = off ]; then
+    "$BL" off >/dev/null 2>&1
+else
+    "$BL" on "$NEXT" >/dev/null 2>&1
+fi || {
+    notify "Lampe non détectée — est-elle branchée ?"
+    echo "Erreur : busylight n'a pas pu piloter la lampe." >&2
+    exit 1
+}
+
+echo "$NEXT" > "$STATE"
+
+case "$NEXT" in
+    green)  LBL="Disponible 🟢" ;;
+    red)    LBL="Occupé 🔴" ;;
+    yellow) LBL="En appel 🟡" ;;
+    off)    LBL="Éteint" ;;
+esac
+notify "$LBL"

@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+"""luxafor-tray — icône dans la zone de notification qui affiche
+la couleur actuelle de la Luxafor et permet de changer de statut."""
+import os
+import shutil
+import subprocess
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("AyatanaAppIndicator3", "0.1")
+from gi.repository import AyatanaAppIndicator3 as AI  # noqa: E402
+from gi.repository import GLib, Gtk  # noqa: E402
+
+HOME = os.path.expanduser("~")
+DATA_HOME = os.environ.get("XDG_DATA_HOME", f"{HOME}/.local/share")
+CACHE_HOME = os.environ.get("XDG_CACHE_HOME", f"{HOME}/.cache")
+
+TOGGLE = shutil.which("luxafor-toggle") or f"{HOME}/.local/bin/luxafor-toggle"
+STATE = f"{CACHE_HOME}/luxafor-state"
+ICON_DIR = f"{DATA_HOME}/luxafor-status/icons"
+
+LABELS = {
+    "green": "Disponible",
+    "red": "Occupé",
+    "yellow": "En appel",
+    "off": "Éteint",
+}
+
+
+def read_state():
+    try:
+        with open(STATE) as f:
+            s = f.read().strip()
+            return s if s in LABELS else "off"
+    except OSError:
+        return "off"
+
+
+def set_status(key):
+    subprocess.Popen([TOGGLE, key])
+
+
+ind = AI.Indicator.new(
+    "luxafor-status", "luxafor-off", AI.IndicatorCategory.APPLICATION_STATUS
+)
+ind.set_icon_theme_path(ICON_DIR)
+ind.set_status(AI.IndicatorStatus.ACTIVE)
+ind.set_title("Luxafor")
+
+menu = Gtk.Menu()
+for key, label in LABELS.items():
+    item = Gtk.MenuItem(label=label)
+    item.connect("activate", lambda _w, k=key: set_status(k))
+    menu.append(item)
+menu.append(Gtk.SeparatorMenuItem())
+quit_item = Gtk.MenuItem(label="Quitter l'icône")
+quit_item.connect("activate", lambda _w: Gtk.main_quit())
+menu.append(quit_item)
+menu.show_all()
+ind.set_menu(menu)
+
+_last = None
+
+
+def refresh():
+    global _last
+    s = read_state()
+    if s != _last:
+        ind.set_icon_full(f"luxafor-{s}", LABELS[s])
+        _last = s
+    return True
+
+
+refresh()
+GLib.timeout_add_seconds(1, refresh)
+Gtk.main()
