@@ -40,13 +40,15 @@ install -d "$STAGE/DEBIAN" "$STAGE/usr/bin" "$DOC" \
     "$STAGE/usr/share/man/man1" "$STAGE/usr/share/metainfo"
 
 install -m 0755 "$ROOT/bin/luxafor-light" "$ROOT/bin/luxafor-toggle" \
-    "$ROOT/bin/luxafor-tray" "$STAGE/usr/bin/"
+    "$ROOT/bin/luxafor-tray" "$ROOT/bin/luxafor-callwatch" "$STAGE/usr/bin/"
 install -m 0644 "$ROOT/share/statuses.conf" "$STAGE/usr/share/$PKG/statuses.conf"
 install -m 0644 "$ROOT/share/icons/luxafor-status.svg" \
     "$STAGE/usr/share/icons/hicolor/scalable/apps/luxafor-status.svg"
 install -m 0644 "$ROOT/udev/70-luxafor-status.rules" "$STAGE/usr/lib/udev/rules.d/"
 sed "s|@BINDIR@|/usr/bin|g" "$ROOT/share/applications/luxafor-tray.desktop.in" \
     > "$STAGE/etc/xdg/autostart/luxafor-tray.desktop"
+sed "s|@BINDIR@|/usr/bin|g" "$ROOT/share/applications/luxafor-callwatch.desktop.in" \
+    > "$STAGE/etc/xdg/autostart/luxafor-callwatch.desktop"
 # AppStream metadata: declares the supported USB IDs (modalias), so software
 # centers can suggest this package when a Luxafor light is plugged in.
 sed "s|  </provides>|  </provides>\n  <releases>\n    <release version=\"$VERSION\" date=\"$(date -u +%Y-%m-%d)\"/>\n  </releases>|" \
@@ -99,20 +101,22 @@ Architecture: all
 Maintainer: $MAINTAINER
 Installed-Size: $(du -sk --exclude=DEBIAN "$STAGE" | cut -f1)
 Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1
-Recommends: libnotify-bin, xdg-utils
+Recommends: libnotify-bin, xdg-utils, pulseaudio-utils
 Section: utils
 Priority: optional
 Homepage: $HOMEPAGE
 Description: control a Luxafor status light (ORB, Flag) from the desktop
  Sets the color of a Luxafor USB status light from a dock launcher, a
- system tray icon showing the current status, or the command line.
+ system tray icon showing the current status, or the command line, and
+ switches it to a chosen status automatically while you are in a call.
  .
  Statuses (name and color) are configurable per user. The light is driven
  directly through its USB HID protocol, with no extra driver; a udev rule
  gives the logged-in user access to it without sudo.
 EOF
 
-echo "/etc/xdg/autostart/luxafor-tray.desktop" > "$STAGE/DEBIAN/conffiles"
+printf '%s\n' /etc/xdg/autostart/luxafor-tray.desktop \
+    /etc/xdg/autostart/luxafor-callwatch.desktop > "$STAGE/DEBIAN/conffiles"
 
 cat > "$STAGE/DEBIAN/postinst" <<'EOF'
 #!/bin/sh

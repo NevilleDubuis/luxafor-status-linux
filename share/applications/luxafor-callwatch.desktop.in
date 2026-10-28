@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Luxafor Call Detection
+Comment=Switches the Luxafor light to a status while you are in a call
+Exec=@BINDIR@/luxafor-callwatch
+Icon=luxafor-status
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

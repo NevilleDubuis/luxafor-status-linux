@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# luxafor-callwatch — switch the light to a status while you are in a call.
+#
+#   luxafor-callwatch           watch the microphone (runs at login)
+#   luxafor-callwatch --check   show which apps use the microphone right now
+#
+# A call is detected when one of the watched applications (web browsers by
+# default, which covers Teams, Odoo, Meet, Jitsi… in a browser tab) records
+# from the microphone. The light then switches to the call status and goes
+# back to the previous status when the call ends — unless you changed the
+# status yourself in the meantime.
+#
+# Settings: ~/.config/luxafor-status/callwatch.conf
+#   status = call                        # status id used during calls
+#   apps   = firefox chrome chromium …   # names matched against the app
+#   enabled = yes                        # "no" to turn detection off
+set -u
+
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+CONF="$CONFIG_HOME/luxafor-status/callwatch.conf"
+BINDIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+TOGGLE="$BINDIR/luxafor-toggle"
+[ -x "$TOGGLE" ] || TOGGLE="luxafor-toggle"
+
+# Seconds to wait before ending a call: browsers sometimes close and reopen
+# the microphone stream (device change, reconnection) during a call.
+END_DELAY="${LUXAFOR_CALL_END_DELAY:-4}"
+
+STATUS=call
+APPS="firefox chrome chromium brave msedge edge vivaldi opera epiphany falkon"
+ENABLED=yes
+
+log() { echo "luxafor-callwatch: $*" >&2; }
+
+trim() { local s="$1"; s="${s#"${s%%[![:space:]]*}"}"; printf '%s' "${s%"${s##*[![:space:]]}"}"; }
+
+load_config() {
+    [ -f "$CONF" ] || return 0
+    local line key value
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="$(trim "${line%%#*}")"
+        [ -n "$line" ] || continue
+        key="$(trim "${line%%=*}")"; value="$(trim "${line#*=}")"
+        case "$key" in
+            status)  STATUS="$value" ;;
+            apps)    APPS="$value" ;;
+            enabled) ENABLED="$value" ;;
+            *) log "unknown setting '$key' in $CONF" ;;
+        esac
+    done < "$CONF"
+}
+
+# Prints one line per microphone stream: "<binary>|<application name>".
+mic_streams() {
+    LC_ALL=C pactl list source-outputs 2>/dev/null | awk '
+        function flush() { if (seen) print bin "|" name; bin = ""; name = ""; seen = 0 }
+        /^Source Output #/ { flush(); seen = 1; next }
+        /application\.process\.binary = / { sub(/^[^"]*"/, ""); sub(/"$/, ""); bin = $0 }
+        /application\.name = /            { sub(/^[^"]*"/, ""); sub(/"$/, ""); name = $0 }
+        END { flush() }
+    '
+}
+
+# Succeeds if a watched application is using the microphone.
+in_call() {
+    local stream app lower
+    while IFS= read -r stream; do
+        lower="$(printf '%s' "$stream" | tr '[:upper:]' '[:lower:]')"
+        for app in $APPS; do
+            case "$lower" in *"$(printf '%s' "$app" | tr '[:upper:]' '[:lower:]')"*) return 0 ;; esac
+        done
+    done < <(mic_streams)
+    return 1
+}
+
+check() {
+    load_config
+    echo "Call status: $STATUS    Watched apps: $APPS    Enabled: $ENABLED"
+    echo
+    local streams
+    streams="$(mic_streams)"
+    if [ -z "$streams" ]; then
+        echo "No application is using the microphone."
+    else
+        echo "Applications using the microphone:"
+        while IFS='|' read -r bin name; do
+            echo "  - ${name:-?} (${bin:-?})"
+        done <<< "$streams"
+    fi
+    echo
+    if in_call; then echo "→ This counts as a call."; else echo "→ Not a call."; fi
+}
+
+# --- main ---------------------------------------------------------------------
+
+case "${1:-}" in
+    -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --check)
+        command -v pactl >/dev/null 2>&1 || { log "pactl not found — install pulseaudio-utils"; exit 1; }
+        check; exit 0 ;;
+    "") ;;
+    *) log "unknown option '$1' (see --help)"; exit 2 ;;
+esac
+
+load_config
+if [ "$ENABLED" != yes ]; then
+    log "disabled in $CONF"; exit 0
+fi
+command -v pactl >/dev/null 2>&1 || { log "pactl not found — install pulseaudio-utils"; exit 1; }
+if ! "$TOGGLE" --list 2>/dev/null | awk '{print $1}' | grep -qx -- "$STATUS"; then
+    log "status '$STATUS' is not in your statuses (see luxafor-toggle --list)"; exit 1
+fi
+
+ACTIVE=0      # 1 while we have switched the light to the call status
+PREVIOUS=off  # status to restore when the call ends
+
+evaluate() {
+    if in_call; then
+        if [ "$ACTIVE" -eq 0 ]; then
+            PREVIOUS="$("$TOGGLE" --current)"
+            if [ "$PREVIOUS" != "$STATUS" ]; then
+                "$TOGGLE" "$STATUS" >/dev/null 2>&1 || log "could not set status '$STATUS'"
+            fi
+            ACTIVE=1
+            log "call started (previous status: $PREVIOUS)"
+        fi
+    elif [ "$ACTIVE" -eq 1 ]; then
+        sleep "$END_DELAY"
+        in_call && return
+        ACTIVE=0
+        # Only restore if nobody changed the status during the call.
+        if [ "$("$TOGGLE" --current)" = "$STATUS" ] && [ "$PREVIOUS" != "$STATUS" ]; then
+            "$TOGGLE" "$PREVIOUS" >/dev/null 2>&1 || log "could not restore status '$PREVIOUS'"
+        fi
+        log "call ended"
+    fi
+}
+
+# React to microphone streams appearing or disappearing. If the audio server
+# restarts, "pactl subscribe" exits: wait a bit and subscribe again.
+while true; do
+    evaluate
+    while IFS= read -r event; do
+        case "$event" in *source-output*) evaluate ;; esac
+    done < <(LC_ALL=C pactl subscribe 2>/dev/null)
+    sleep 3
+done

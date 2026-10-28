@@ -78,5 +78,58 @@ if command -v desktop-file-validate >/dev/null 2>&1; then
     else fail "launcher passes desktop-file-validate"; fi
 fi
 
+echo "luxafor-callwatch"
+# Fake pactl: "list source-outputs" prints $TMP/streams, "subscribe" reads
+# events from a FIFO that the test writes to.
+mkdir -p "$TMP/fakebin"
+mkfifo "$TMP/events"
+cat > "$TMP/fakebin/pactl" <<EOF
+#!/bin/sh
+case "\$1" in
+    list) cat "$TMP/streams" 2>/dev/null ;;
+    subscribe) exec cat "$TMP/events" ;;
+esac
+EOF
+chmod +x "$TMP/fakebin/pactl"
+stream() {  # id app-name binary
+    printf 'Source Output #%s\n\tDriver: PipeWire\n\tProperties:\n\t\tapplication.name = "%s"\n\t\tapplication.process.binary = "%s"\n' "$1" "$2" "$3"
+}
+event() { echo "Event '$1' on source-output #$2" >&3; sleep 0.5; }
+WATCH="$ROOT/bin/luxafor-callwatch"
+export PATH="$TMP/fakebin:$PATH" LUXAFOR_CALL_END_DELAY=1
+printf 'status = focus   # blue during calls\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
+
+stream 41 "Audio Recorder" gnome-sound-recorder > "$TMP/streams"
+eq "--check ignores non-browser apps" "$("$WATCH" --check | tail -1)" "→ Not a call."
+stream 52 "Google Chrome" chrome > "$TMP/streams"
+eq "--check detects a browser" "$("$WATCH" --check | tail -1)" "→ This counts as a call."
+
+: > "$TMP/streams"
+"$TOGGLE" dispo >/dev/null 2>&1
+exec 3<>"$TMP/events"
+"$WATCH" 2>/dev/null & WATCH_PID=$!
+trap 'kill "$WATCH_PID" 2>/dev/null; rm -rf "$TMP"' EXIT
+sleep 0.5
+
+stream 52 "Google Chrome" chrome > "$TMP/streams"; event new 52
+eq "call starts → configured status" "$("$TOGGLE" --current)" focus
+eq "light shows the call color" "$(bytes hidraw1)" "00 01 ff 00 00 ff 00 00 00"
+: > "$TMP/streams"; event remove 52
+stream 53 "Google Chrome" chrome > "$TMP/streams"; event new 53; sleep 1
+eq "brief microphone drop keeps the call" "$("$TOGGLE" --current)" focus
+: > "$TMP/streams"; event remove 53; sleep 1.5
+eq "call ends → previous status restored" "$("$TOGGLE" --current)" dispo
+
+stream 60 Firefox firefox > "$TMP/streams"; event new 60
+"$TOGGLE" pipe >/dev/null 2>&1
+: > "$TMP/streams"; event remove 60; sleep 1.5
+eq "status changed during the call is kept" "$("$TOGGLE" --current)" pipe
+
+kill "$WATCH_PID" 2>/dev/null; exec 3>&-
+printf 'status = nope\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
+"$WATCH" 2>/dev/null; eq "unknown call status exits 1" "$?" 1
+printf 'enabled = no\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
+"$WATCH" 2>/dev/null; eq "enabled = no exits cleanly" "$?" 0
+
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

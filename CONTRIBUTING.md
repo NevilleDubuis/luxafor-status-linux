@@ -27,7 +27,7 @@ Running `luxafor-toggle` from a terminal usually prints a useful error message.
    ```bash
    tests/run.sh                 # driver and statuses, no light needed
    shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle \
-              packaging/build-deb.sh tests/run.sh
+              bin/luxafor-callwatch packaging/build-deb.sh tests/run.sh
    python3 -m py_compile bin/luxafor-tray
    ```
 
@@ -62,9 +62,10 @@ bin/luxafor-light      driver: writes HID reports to /dev/hidraw* (pure bash)
 bin/luxafor-toggle     sets or cycles the status (calls luxafor-light), and generates
                        the status icons and the dock launcher (--reload)
 bin/luxafor-tray       tray icon showing the current status (Python + AppIndicator)
+bin/luxafor-callwatch  call detection: watches microphone streams with `pactl`
 share/statuses.conf    default status configuration
 share/icons/           application icon (luxafor-status)
-share/applications/    tray autostart template (@BINDIR@ is replaced at install time)
+share/applications/    autostart templates (@BINDIR@ is replaced at install time)
 udev/                  udev rule granting the logged-in user access to the light
 install.sh             per-user installer (from source)
 uninstall.sh           uninstaller for the per-user install
@@ -78,6 +79,8 @@ Runtime files:
 - `~/.config/luxafor-status/statuses.conf` — the user's statuses
   (`id | color | label`). `luxafor-toggle` and `luxafor-tray` both parse it and
   must stay in sync if the format changes.
+- `~/.config/luxafor-status/callwatch.conf` — optional call detection
+  settings (`status`, `apps`, `enabled`).
 - `~/.cache/luxafor-state` — the current status id. The tray icon polls it
   (and the config file's modification time) every second, so any tool that
   calls `luxafor-toggle` keeps the tray in sync.
