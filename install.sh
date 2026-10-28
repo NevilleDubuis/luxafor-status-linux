@@ -122,8 +122,10 @@ fi
 
 # 5. Check --------------------------------------------------------------------
 step "Checking"
-if command -v busylight >/dev/null 2>&1 && busylight list 2>/dev/null | grep -qi luxafor; then
-    ok "Luxafor light detected"
+# "busylight list" prints one line per light, e.g. "  0 Orb"
+LIGHTS="$(busylight list 2>/dev/null | grep -E '^[[:space:]]*[0-9]+[[:space:]]+' || true)"
+if [ -n "$LIGHTS" ]; then
+    while IFS= read -r l; do ok "light detected: $(echo "$l" | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+//')"; done <<< "$LIGHTS"
 else
     warn "no Luxafor detected — unplug and replug the light, then run: busylight list"
 fi
