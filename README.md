@@ -4,17 +4,17 @@ Control a **Luxafor** status light from Ubuntu, with:
 
 - 🖱️ **a dock button** — click to cycle through statuses, right-click to pick one;
 - 🟢 **a system tray icon** that shows the current color;
-- ⌨️ **a command** — `luxafor-toggle` — for scripts and keyboard shortcuts.
+- ⌨️ **a command** — `luxafor-toggle` — for scripts and keyboard shortcuts;
+- 🎨 **your own statuses** — as many as you want, with any name and color.
 
-| Status                 | Color      |
-|------------------------|------------|
-| Disponible (available) | 🟢 green   |
-| Occupé (busy)          | 🔴 red     |
-| En appel (on a call)   | 🟡 yellow  |
-| Éteint (off)           | ⚪ —       |
+Default statuses:
 
-> [!NOTE]
-> The interface labels are currently in French. Translations are very welcome — see [Contributing](#contributing).
+| Status    | Color     |
+|-----------|-----------|
+| Available | 🟢 green  |
+| Busy      | 🔴 red    |
+| On a call | 🟡 yellow |
+| Off       | ⚪ —      |
 
 Luxafor's official software does not support Linux. This project builds on
 [busylight-for-humans](https://pypi.org/project/busylight-for-humans/), an open
@@ -62,17 +62,53 @@ Options:
 - **Terminal**:
 
   ```bash
-  luxafor-toggle          # next status
-  luxafor-toggle red      # green | red | yellow | off
+  luxafor-toggle              # next status
+  luxafor-toggle busy         # set a status by its id
+  luxafor-toggle off
+  luxafor-toggle --list       # list your statuses
+  luxafor-toggle --current    # print the current status
   ```
 
   Handy for a custom keyboard shortcut (Settings → Keyboard → Custom Shortcuts).
+
+## Customizing statuses
+
+Statuses live in `~/.config/luxafor-status/statuses.conf`. Open it with:
+
+```bash
+luxafor-toggle --edit
+```
+
+or from the tray menu → **Edit statuses…**
+
+One status per line, as `id | color | label`:
+
+```
+available | green   | Available
+busy      | red     | Busy
+call      | yellow  | On a call
+focus     | #0000ff | Focus — do not disturb
+lunch     | orange  | Lunch break
+```
+
+- **id** — the short name for `luxafor-toggle <id>` (lowercase letters, digits, `-`, `_`; `off` is reserved);
+- **color** — a color name (`red`, `orange`, `purple`…) or a hex code (`#ff8800`);
+- **label** — what you see in menus and notifications; any language, spaces allowed.
+
+Add as many statuses as you like. The dock button cycles through them in file
+order, then off. The tray icon picks up changes automatically when you save;
+the dock's right-click menu is updated too (run `luxafor-toggle --reload` if
+you edited the file while the tray icon wasn't running).
+
+Your configuration is kept when you re-run `./install.sh`.
 
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| "Lampe non détectée" notification | Unplug/replug the light, then run `busylight list`. |
+| "could not reach the light" notification | Unplug/replug the light, then run `busylight list`. |
+| "could not set color" notification | Check the color in your `statuses.conf` — try a hex code like `#ff8800`. |
+| A status is missing from the menu | Run `luxafor-toggle --list`: invalid lines in `statuses.conf` are reported there. |
 | `busylight list` shows nothing | Run `lsusb \| grep -i 04d8`. If the light is listed, it's the udev rule — re-run `./install.sh` and replug. |
 | No tray icon | Make sure the "System Tray" applet is on your panel. On GNOME, install the *AppIndicator Support* extension. |
 | `luxafor-toggle: command not found` | Log out and back in so `~/.local/bin` is on your `PATH`. |
@@ -81,7 +117,7 @@ Options:
 
 ```bash
 ./uninstall.sh         # removes scripts, launchers and icons
-./uninstall.sh --all   # also removes busylight-for-humans and the udev rule
+./uninstall.sh --all   # also removes your statuses, busylight-for-humans and the udev rule
 ```
 
 ## Contributing
@@ -90,7 +126,7 @@ Contributions are very welcome! This is a small hobby project, and help of any
 size is appreciated:
 
 - 🧪 **testing** with other Luxafor models or Linux distributions / desktops;
-- 🌍 **translations** of the interface labels;
+- 🌍 **translations** of the default statuses and messages;
 - 🐛 **bug reports** and fixes;
 - ✨ **ideas** — e.g. automatic status from calendar, screen lock or video calls.
 

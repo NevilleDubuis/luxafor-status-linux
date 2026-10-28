@@ -1,57 +1,185 @@
 #!/usr/bin/env bash
-# luxafor-toggle — change le statut de la Luxafor.
-#   luxafor-toggle            fait défiler : éteint → vert → rouge → jaune → éteint
-#   luxafor-toggle <statut>   green | red | yellow | off
+# luxafor-toggle — set the status of a Luxafor light.
+#
+#   luxafor-toggle            cycle: first status → … → last status → off
+#   luxafor-toggle <id>       set a status by its id (see --list), or "off"
+#   luxafor-toggle --list     list configured statuses
+#   luxafor-toggle --current  print the current status id
+#   luxafor-toggle --edit     edit the status configuration
+#   luxafor-toggle --reload   regenerate icons and launcher after editing
 set -u
 
-STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}"
-STATE="$STATE_DIR/luxafor-state"
-mkdir -p "$STATE_DIR"
+BINDIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
-BL="$(command -v busylight || true)"
-[ -z "$BL" ] && [ -x "$HOME/.local/bin/busylight" ] && BL="$HOME/.local/bin/busylight"
+CONF="$CONFIG_HOME/luxafor-status/statuses.conf"
+DEFAULT_CONF="$DATA_HOME/luxafor-status/statuses.conf"
+STATE="$CACHE_HOME/luxafor-state"
+ICON_DIR="$DATA_HOME/luxafor-status/icons"
+DESKTOP_FILE="$DATA_HOME/applications/luxafor.desktop"
+OFF_COLOR="#9e9e9e"
+
+# --- helpers ------------------------------------------------------------------
+
+trim() { local s="$1"; s="${s#"${s%%[![:space:]]*}"}"; printf '%s' "${s%"${s##*[![:space:]]}"}"; }
 
 notify() {
-    command -v notify-send >/dev/null 2>&1 && notify-send -t 1500 -i luxafor "Luxafor" "$1"
+    command -v notify-send >/dev/null 2>&1 || return 0
+    notify-send -t 1500 -i "${2:-luxafor-status}" "Luxafor" "$1"
 }
 
-if [ -z "$BL" ]; then
-    notify "busylight introuvable — relance install.sh"
-    echo "Erreur : la commande 'busylight' est introuvable." >&2
-    exit 1
-fi
+die() { echo "luxafor-toggle: $1" >&2; notify "$1"; exit "${2:-1}"; }
+
+# Loads statuses into IDS / COLORS / LABELS (parallel arrays).
+load_statuses() {
+    IDS=(); COLORS=(); LABELS=()
+    local file="$CONF" line id color label n=0
+    [ -f "$file" ] || file="$DEFAULT_CONF"
+    if [ ! -f "$file" ]; then
+        IDS=(available busy call); COLORS=(green red yellow)
+        LABELS=("Available" "Busy" "On a call"); return
+    fi
+    while IFS= read -r line || [ -n "$line" ]; do
+        n=$((n + 1))
+        line="$(trim "$line")"
+        case "$line" in ''|\#*) continue ;; esac
+        IFS='|' read -r id color label <<< "$line"
+        id="$(trim "$id")"; color="$(trim "${color:-}")"; label="$(trim "${label:-}")"
+        if ! [[ "$id" =~ ^[a-z0-9_-]+$ ]] || [ "$id" = off ] || [ -z "$color" ]; then
+            [ "$VERBOSE" -eq 1 ] && echo "luxafor-toggle: ignoring invalid line $n in $file: $line" >&2
+            continue
+        fi
+        IDS+=("$id"); COLORS+=("$color"); LABELS+=("${label:-$id}")
+    done < "$file"
+    [ "${#IDS[@]}" -gt 0 ] || die "no valid status in $file"
+}
+
+index_of() {
+    local i
+    for i in "${!IDS[@]}"; do [ "${IDS[$i]}" = "$1" ] && { echo "$i"; return 0; }; done
+    return 1
+}
+
+find_busylight() {
+    BL="$(command -v busylight || true)"
+    [ -z "$BL" ] && [ -x "$HOME/.local/bin/busylight" ] && BL="$HOME/.local/bin/busylight"
+    [ -n "$BL" ] || die "'busylight' not found — re-run install.sh"
+}
+
+desktop_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g'; }
+
+# Regenerates the status icons and the launcher's right-click actions.
+reload() {
+    local i id actions=""
+    mkdir -p "$ICON_DIR" "$(dirname "$DESKTOP_FILE")"
+    rm -f "$ICON_DIR"/luxafor-*.svg
+    for i in "${!IDS[@]}"; do
+        printf '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="%s"/></svg>\n' \
+            "${COLORS[$i]}" > "$ICON_DIR/luxafor-${IDS[$i]}.svg"
+        actions+="${IDS[$i]};"
+    done
+    printf '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="%s"/></svg>\n' \
+        "$OFF_COLOR" > "$ICON_DIR/luxafor-off.svg"
+
+    {
+        echo "[Desktop Entry]"
+        echo "Type=Application"
+        echo "Name=Luxafor"
+        echo "Comment=Change the Luxafor light status"
+        echo "Exec=$BINDIR/luxafor-toggle"
+        echo "Icon=luxafor-status"
+        echo "Terminal=false"
+        echo "Categories=Utility;"
+        echo "Keywords=luxafor;busylight;status;"
+        echo "Actions=${actions}off;"
+        for i in "${!IDS[@]}"; do
+            id="${IDS[$i]}"
+            printf '\n[Desktop Action %s]\nName=%s\nExec=%s/luxafor-toggle %s\n' \
+                "$id" "$(desktop_escape "${LABELS[$i]}")" "$BINDIR" "$id"
+        done
+        printf '\n[Desktop Action off]\nName=Off\nExec=%s/luxafor-toggle off\n' "$BINDIR"
+    } > "$DESKTOP_FILE"
+    command -v update-desktop-database >/dev/null 2>&1 \
+        && update-desktop-database "$(dirname "$DESKTOP_FILE")" >/dev/null 2>&1
+    return 0
+}
+
+edit_config() {
+    if [ ! -f "$CONF" ]; then
+        mkdir -p "$(dirname "$CONF")"
+        if [ -f "$DEFAULT_CONF" ]; then cp "$DEFAULT_CONF" "$CONF"
+        else die "default configuration not found — re-run install.sh"; fi
+    fi
+    if [ -t 0 ] && [ -t 1 ]; then
+        "${VISUAL:-${EDITOR:-nano}}" "$CONF"
+        VERBOSE=1; load_statuses; reload
+        echo "Statuses reloaded."
+    else
+        # Opened from the tray: the tray reloads automatically once the file is saved.
+        xdg-open "$CONF" >/dev/null 2>&1 &
+    fi
+}
+
+# --- main ---------------------------------------------------------------------
 
 case "${1:-}" in
-    green|red|yellow|off) NEXT="$1" ;;
-    "")
-        CUR="$(cat "$STATE" 2>/dev/null || echo off)"
-        case "$CUR" in
-            off)    NEXT=green ;;
-            green)  NEXT=red ;;
-            red)    NEXT=yellow ;;
-            *)      NEXT=off ;;
-        esac ;;
-    *)
-        echo "Usage : $(basename "$0") [green|red|yellow|off]" >&2
-        exit 2 ;;
+    -h|--help)
+        sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --edit)
+        edit_config; exit 0 ;;
 esac
+
+VERBOSE=0
+case "${1:-}" in --list|--reload) VERBOSE=1 ;; esac
+load_statuses
+
+case "${1:-}" in
+    --list)
+        for i in "${!IDS[@]}"; do printf '%-12s %-10s %s\n' "${IDS[$i]}" "${COLORS[$i]}" "${LABELS[$i]}"; done
+        printf '%-12s %-10s %s\n' off - Off
+        exit 0 ;;
+    --current)
+        cat "$STATE" 2>/dev/null || echo off; exit 0 ;;
+    --reload)
+        reload; echo "Statuses reloaded."; exit 0 ;;
+    -*)
+        echo "Unknown option: $1 (see --help)" >&2; exit 2 ;;
+esac
+
+if [ -z "${1:-}" ]; then
+    CUR="$(cat "$STATE" 2>/dev/null || echo off)"
+    if [ "$CUR" = off ] || ! i="$(index_of "$CUR")"; then
+        NEXT="${IDS[0]}"
+    elif [ "$((i + 1))" -lt "${#IDS[@]}" ]; then
+        NEXT="${IDS[$((i + 1))]}"
+    else
+        NEXT=off
+    fi
+else
+    NEXT="$1"
+    if [ "$NEXT" != off ] && ! index_of "$NEXT" >/dev/null; then
+        echo "Unknown status '$NEXT'. Available: ${IDS[*]} off" >&2
+        exit 2
+    fi
+fi
+
+find_busylight
 
 if [ "$NEXT" = off ]; then
-    "$BL" off >/dev/null 2>&1
+    "$BL" off >/dev/null 2>&1 || die "could not reach the light — is it plugged in?"
+    LABEL="Off"
 else
-    "$BL" on "$NEXT" >/dev/null 2>&1
-fi || {
-    notify "Lampe non détectée — est-elle branchée ?"
-    echo "Erreur : busylight n'a pas pu piloter la lampe." >&2
-    exit 1
-}
+    i="$(index_of "$NEXT")"
+    "$BL" on "${COLORS[$i]}" >/dev/null 2>&1 \
+        || die "could not set color '${COLORS[$i]}' — is the light plugged in and the color valid?"
+    LABEL="${LABELS[$i]}"
+fi
 
+mkdir -p "$(dirname "$STATE")"
 echo "$NEXT" > "$STATE"
 
-case "$NEXT" in
-    green)  LBL="Disponible 🟢" ;;
-    red)    LBL="Occupé 🔴" ;;
-    yellow) LBL="En appel 🟡" ;;
-    off)    LBL="Éteint" ;;
-esac
-notify "$LBL"
+ICON="$ICON_DIR/luxafor-$NEXT.svg"
+[ -f "$ICON" ] || ICON=luxafor-status
+notify "$LABEL" "$ICON"
