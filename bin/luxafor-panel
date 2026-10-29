@@ -163,33 +163,8 @@ class Panel(Gtk.ApplicationWindow):
         box.pack_start(head, False, False, 0)
         box.pack_start(Gtk.Separator(), False, False, 4)
 
-        # Statuses
-        box.pack_start(self.heading("STATUS"), False, False, 0)
-        grid = Gtk.Grid(column_spacing=6, row_spacing=6, column_homogeneous=True)
-        self.status_buttons = {}
-        for n, (sid, color, label) in enumerate(self.statuses):
-            button = Gtk.Button()
-            content = Gtk.Box(spacing=8)
-            content.pack_start(dot(color), False, False, 0)
-            name = Gtk.Label(label=label, xalign=0)
-            name.set_ellipsize(Pango.EllipsizeMode.END)
-            content.pack_start(name, True, True, 0)
-            if n < 9:
-                key = Gtk.Label(label=str(n + 1))
-                key.get_style_context().add_class("lx-hint")
-                content.pack_end(key, False, False, 0)
-            button.add(content)
-            button.get_style_context().add_class("lx-status")
-            if sid == self.current:
-                button.get_style_context().add_class("lx-current")
-            button.set_tooltip_text(f"luxafor-toggle {sid}")
-            button.connect("clicked", self.on_status, sid)
-            grid.attach(button, n % 2, n // 2, 1, 1)
-            self.status_buttons[sid] = button
-        box.pack_start(grid, False, False, 0)
-
         # Duration
-        box.pack_start(self.heading("FOR"), False, False, 0)
+        box.pack_start(self.heading("1 · DURATION"), False, False, 0)
         durations = Gtk.Box(spacing=0)
         durations.get_style_context().add_class("linked")
         self.duration_buttons = {}
@@ -216,6 +191,32 @@ class Panel(Gtk.ApplicationWindow):
             self.duration_buttons[minutes] = button
             group = group or button
         box.pack_start(durations, False, False, 0)
+        box.pack_start(Gtk.Box(), False, False, 2)
+
+        # Statuses
+        box.pack_start(self.heading("2 · STATUS"), False, False, 0)
+        grid = Gtk.Grid(column_spacing=6, row_spacing=6, column_homogeneous=True)
+        self.status_buttons = {}
+        for n, (sid, color, label) in enumerate(self.statuses):
+            button = Gtk.Button()
+            content = Gtk.Box(spacing=8)
+            content.pack_start(dot(color), False, False, 0)
+            name = Gtk.Label(label=label, xalign=0)
+            name.set_ellipsize(Pango.EllipsizeMode.END)
+            content.pack_start(name, True, True, 0)
+            if n < 9:
+                key = Gtk.Label(label=str(n + 1))
+                key.get_style_context().add_class("lx-hint")
+                content.pack_end(key, False, False, 0)
+            button.add(content)
+            button.get_style_context().add_class("lx-status")
+            if sid == self.current:
+                button.get_style_context().add_class("lx-current")
+            button.set_tooltip_text(f"luxafor-toggle {sid}")
+            button.connect("clicked", self.on_status, sid)
+            grid.attach(button, n % 2, n // 2, 1, 1)
+            self.status_buttons[sid] = button
+        box.pack_start(grid, False, False, 0)
 
         # Footer
         footer = Gtk.Box(spacing=8)
