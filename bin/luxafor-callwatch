@@ -32,6 +32,15 @@ ENABLED=yes
 
 log() { echo "luxafor-callwatch: $*" >&2; }
 
+# For problems the user must fix: the watcher runs at login, so stderr is
+# usually not visible.
+alert() {
+    log "$*"
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send -i luxafor-status "Luxafor call detection" "$*" 2>/dev/null || true
+    fi
+}
+
 trim() { local s="$1"; s="${s#"${s%%[![:space:]]*}"}"; printf '%s' "${s%"${s##*[![:space:]]}"}"; }
 
 load_config() {
@@ -106,9 +115,9 @@ load_config
 if [ "$ENABLED" != yes ]; then
     log "disabled in $CONF"; exit 0
 fi
-command -v pactl >/dev/null 2>&1 || { log "pactl not found — install pulseaudio-utils"; exit 1; }
+command -v pactl >/dev/null 2>&1 || { alert "pactl not found — install it with: sudo apt install pulseaudio-utils"; exit 1; }
 if ! "$TOGGLE" --list 2>/dev/null | awk '{print $1}' | grep -qx -- "$STATUS"; then
-    log "status '$STATUS' is not in your statuses (see luxafor-toggle --list)"; exit 1
+    alert "status '$STATUS' from callwatch.conf is not in your statuses (see luxafor-toggle --list)"; exit 1
 fi
 
 ACTIVE=0      # 1 while we have switched the light to the call status

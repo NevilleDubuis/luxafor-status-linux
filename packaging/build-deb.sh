@@ -100,8 +100,8 @@ Version: $VERSION
 Architecture: all
 Maintainer: $MAINTAINER
 Installed-Size: $(du -sk --exclude=DEBIAN "$STAGE" | cut -f1)
-Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1
-Recommends: libnotify-bin, xdg-utils, pulseaudio-utils
+Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1, pulseaudio-utils
+Recommends: libnotify-bin, xdg-utils
 Section: utils
 Priority: optional
 Homepage: $HOMEPAGE
