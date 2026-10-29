@@ -24,6 +24,12 @@ configuration when the file is saved.
 .PP
 It is started at login through
 .IR /etc/xdg/autostart/luxafor-tray.desktop .
+.PP
+Only one tray runs per session: starting it again replaces the running one.
+.SH FILES
+.TP
+.I ~/.cache/luxafor-tray.log
+Errors met while running.
 .SH SEE ALSO
 .BR luxafor-panel (1),
 .BR luxafor-light (1),

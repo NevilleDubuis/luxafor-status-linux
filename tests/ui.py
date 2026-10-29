@@ -238,6 +238,18 @@ try:
     eq("cancel timer from the menu", toggle("--timer"), "No timer.")
     click("Off")
     eq("off from the menu", toggle("--current"), "off")
+
+    # An error during an update must not stop the updates (GLib drops a
+    # timeout whose callback raises).
+    real = tray.update_timer
+    tray.update_timer = lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+    eq("tick survives an error", tray.tick(), True)
+    tray.update_timer = real
+    log = open(f"{TMP}/cache/luxafor-tray.log").read()
+    eq("error logged to ~/.cache/luxafor-tray.log", "RuntimeError: boom" in log, True)
+    toggle("busy")
+    pump(1.5)
+    eq("updates go on after the error", tray.last_state, "busy")
     toggle("--cancel-timer")
 except Exception as e:  # AppIndicator needs a D-Bus session
     FAIL += 1

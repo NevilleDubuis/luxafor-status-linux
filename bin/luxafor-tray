@@ -10,13 +10,14 @@ import shutil
 import subprocess
 import sys
 import time
+import traceback
 
 import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("AyatanaAppIndicator3", "0.1")
 from gi.repository import AyatanaAppIndicator3 as AI  # noqa: E402
-from gi.repository import GLib, Gtk  # noqa: E402
+from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
 HOME = os.path.expanduser("~")
 DATA_HOME = os.environ.get("XDG_DATA_HOME", f"{HOME}/.local/share")
@@ -121,6 +122,24 @@ def load_shortcuts():
         except ValueError:
             pass
     return shortcuts
+
+
+LOG = f"{CACHE_HOME}/luxafor-tray.log"
+BUS_NAME = "io.github.nevilledubuis.luxafor_status.tray"
+
+
+def log(message):
+    """Errors go to stderr and to ~/.cache/luxafor-tray.log (kept short):
+    started at login, the tray has no terminal to show them."""
+    line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}"
+    print(line, file=sys.stderr, flush=True)
+    try:
+        os.makedirs(os.path.dirname(LOG), exist_ok=True)
+        old = open(LOG).read().splitlines()[-400:] if os.path.exists(LOG) else []
+        with open(LOG, "w") as f:
+            f.write("\n".join(old + [line]) + "\n")
+    except OSError:
+        pass
 
 
 _children = []
@@ -278,6 +297,15 @@ class Tray:
         self.ind.set_secondary_activate_target(other)
 
     def tick(self):
+        # An exception escaping a GLib timeout callback removes the timeout:
+        # the icon would never update again. Log it and keep going.
+        try:
+            self.update()
+        except Exception:
+            log("error while updating:\n" + traceback.format_exc())
+        return True
+
+    def update(self):
         mtime = config_mtime()
         if mtime != self.mtime:
             self.mtime = mtime
@@ -290,7 +318,6 @@ class Tray:
             self.last_state = state
         self.update_timer()
         reap_children()
-        return True
 
     def update_timer(self):
         timer = read_timer()
@@ -313,6 +340,34 @@ class Tray:
             self.timer_text = text
 
 
-if __name__ == "__main__":
-    Tray()
+def main():
+    """One tray per session. A new one (after an upgrade, or started by hand)
+    takes over: the previous one sees the D-Bus name go and quits, so its
+    icon goes away instead of staying behind, frozen."""
+    state = {"tray": None}
+
+    def acquired(_conn, _name):
+        if state["tray"] is None:
+            state["tray"] = Tray()
+
+    def lost(_conn, _name):
+        if state["tray"] is None:
+            log("cannot own the tray bus name — starting anyway")
+            state["tray"] = Tray()
+        else:
+            log("another luxafor-tray took over, quitting")
+            Gtk.main_quit()
+
+    Gio.bus_own_name(
+        Gio.BusType.SESSION,
+        BUS_NAME,
+        Gio.BusNameOwnerFlags.ALLOW_REPLACEMENT | Gio.BusNameOwnerFlags.REPLACE,
+        None,
+        acquired,
+        lost,
+    )
     Gtk.main()
+
+
+if __name__ == "__main__":
+    main()
