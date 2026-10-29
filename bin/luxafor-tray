@@ -8,13 +8,16 @@ import os
 import re
 import shutil
 import subprocess
+import sys
+import time
+import traceback
 
 import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("AyatanaAppIndicator3", "0.1")
 from gi.repository import AyatanaAppIndicator3 as AI  # noqa: E402
-from gi.repository import GLib, Gtk  # noqa: E402
+from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
 HOME = os.path.expanduser("~")
 DATA_HOME = os.environ.get("XDG_DATA_HOME", f"{HOME}/.local/share")
@@ -23,6 +26,7 @@ CACHE_HOME = os.environ.get("XDG_CACHE_HOME", f"{HOME}/.cache")
 
 # Prefer the luxafor-toggle installed next to this script (per-user or package).
 _HERE = os.path.dirname(os.path.realpath(__file__))
+PANEL = f"{_HERE}/luxafor-panel" if os.path.isfile(f"{_HERE}/luxafor-panel") else "luxafor-panel"
 TOGGLE = (
     f"{_HERE}/luxafor-toggle"
     if os.path.isfile(f"{_HERE}/luxafor-toggle")
@@ -42,6 +46,8 @@ DEFAULT_CONF = next(
     f"{DATA_HOME}/luxafor-status/statuses.conf",
 )
 STATE = f"{CACHE_HOME}/luxafor-state"
+TIMER = f"{CACHE_HOME}/luxafor-timer"
+
 
 # Tray icons go straight into ~/.local/share/icons: every icon lookup
 # (GTK and system tray hosts such as Budgie's) searches that folder.
@@ -103,6 +109,63 @@ def load_statuses():
     return statuses or FALLBACK
 
 
+def load_shortcuts():
+    """[(status id, minutes)] for the tray menu — see timer-shortcuts."""
+    shortcuts = []
+    out = subprocess.run(
+        [TOGGLE, "--setting", "timer-shortcuts"], capture_output=True, text=True, check=False
+    ).stdout
+    for line in out.splitlines():
+        try:
+            sid, minutes = line.split()
+            shortcuts.append((sid, int(minutes)))
+        except ValueError:
+            pass
+    return shortcuts
+
+
+LOG = f"{CACHE_HOME}/luxafor-tray.log"
+BUS_NAME = "io.github.nevilledubuis.luxafor_status.tray"
+
+
+def log(message):
+    """Errors go to stderr and to ~/.cache/luxafor-tray.log (kept short):
+    started at login, the tray has no terminal to show them."""
+    line = f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}"
+    print(line, file=sys.stderr, flush=True)
+    try:
+        os.makedirs(os.path.dirname(LOG), exist_ok=True)
+        old = open(LOG).read().splitlines()[-400:] if os.path.exists(LOG) else []
+        with open(LOG, "w") as f:
+            f.write("\n".join(old + [line]) + "\n")
+    except OSError:
+        pass
+
+
+_children = []
+
+
+def spawn(*args):
+    """Starts a command without waiting for it; reap_children() collects it.
+
+    Without that, every closed panel or finished luxafor-toggle would stay
+    behind as a zombie process of the tray.
+    """
+    try:
+        # Detached from any terminal the tray was started from: otherwise a
+        # child touching that terminal gets suspended by the shell's job
+        # control, and whatever waits for it with it.
+        _children.append(subprocess.Popen(
+            list(args), stdin=subprocess.DEVNULL, start_new_session=True
+        ))
+    except OSError as e:
+        print(f"luxafor-tray: cannot run {args[0]}: {e}", file=sys.stderr)
+
+
+def reap_children():
+    _children[:] = [p for p in _children if p.poll() is None]
+
+
 def read_state():
     try:
         with open(STATE) as f:
@@ -129,6 +192,23 @@ def write_tray_icons(statuses):
     return names
 
 
+def read_timer():
+    """Returns (end epoch, status id) of the running timer, or None."""
+    try:
+        with open(TIMER) as f:
+            end, status = f.read().split()[:2]
+            return int(end), status
+    except (OSError, ValueError):
+        return None
+
+
+def human_minutes(minutes):
+    if minutes < 60:
+        return f"{minutes} min"
+    hours, rest = divmod(minutes, 60)
+    return f"{hours} h" if rest == 0 else f"{hours} h {rest:02d}"
+
+
 class Tray:
     def __init__(self):
         self.ind = AI.Indicator.new(
@@ -141,6 +221,11 @@ class Tray:
         self.icons = {}
         self.mtime = object()  # forces a first load
         self.last_state = None
+        self.timer = None        # (end, status) shown in the menu
+        self.timer_item = None   # menu line showing the time left
+        self.timer_text = None
+        # Restart a timer that was running before logout, or end it if expired.
+        spawn(TOGGLE, "--resume-timer")
         self.tick()
         GLib.timeout_add_seconds(1, self.tick)
 
@@ -153,27 +238,79 @@ class Tray:
             check=False,
         )
         self.statuses = load_statuses()
+        self.shortcuts = load_shortcuts()
         self.icons = write_tray_icons(self.statuses)
         self.build_menu()
         self.last_state = None  # force the icon to be set again
 
+    def label_of(self, sid):
+        return next((l for s, _c, l in self.statuses if s == sid), "Off" if sid == "off" else sid)
+
+    def timer_line(self):
+        end, status = self.timer
+        left = max(0, round((end - time.time()) / 60 + 0.49))
+        until = time.strftime("%H:%M", time.localtime(end))
+        return f"⏱ {self.label_of(status)} until {until} ({human_minutes(left)} left)", left
+
     def build_menu(self):
+        # Drop the middle-click target first: it belongs to the old menu,
+        # which is about to be destroyed.
+        self.ind.set_secondary_activate_target(None)
         menu = Gtk.Menu()
-        for sid, _color, label in self.statuses + [("off", OFF_COLOR, "Off")]:
+
+        def add(label, args=None, action=None, enabled=True):
             item = Gtk.MenuItem(label=label)
-            item.connect("activate", lambda _w, s=sid: subprocess.Popen([TOGGLE, s]))
+            item.set_sensitive(enabled)
+            if args:
+                item.connect("activate", lambda _w: spawn(TOGGLE, *args))
+            elif action:
+                item.connect("activate", lambda _w: action())
             menu.append(item)
-        menu.append(Gtk.SeparatorMenuItem())
-        edit = Gtk.MenuItem(label="Edit statuses…")
-        edit.connect("activate", lambda _w: subprocess.Popen([TOGGLE, "--edit"]))
-        menu.append(edit)
-        quit_item = Gtk.MenuItem(label="Quit tray icon")
-        quit_item.connect("activate", lambda _w: Gtk.main_quit())
-        menu.append(quit_item)
+            return item
+
+        def separator():
+            menu.append(Gtk.SeparatorMenuItem())
+
+        # Running timer
+        self.timer_item = None
+        if self.timer:
+            self.timer_item = add(self.timer_line()[0], enabled=False)
+            add("Cancel timer", ["--cancel-timer"])
+            separator()
+
+        # Statuses, in one click
+        for sid, _color, label in self.statuses:
+            add(label, [sid])
+        separator()
+
+        # Timers, in one click; anything else in the panel
+        for sid, minutes in self.shortcuts:
+            add(f"{self.label_of(sid)} for {human_minutes(minutes)}", [sid, "--for", str(minutes)])
+        other = add("Other duration…", action=lambda: spawn(PANEL))
+        separator()
+
+        # Off isn't a status: the light is just off
+        add("Off", ["off"])
+        separator()
+
+        add("Edit statuses…", ["--edit", "--gui"])
+        add("Quit", action=Gtk.main_quit)
         menu.show_all()
         self.ind.set_menu(menu)
+        # Middle-click on the icon opens the panel. Set after set_menu: the
+        # target must belong to the menu in use.
+        self.ind.set_secondary_activate_target(other)
 
     def tick(self):
+        # An exception escaping a GLib timeout callback removes the timeout:
+        # the icon would never update again. Log it and keep going.
+        try:
+            self.update()
+        except Exception:
+            log("error while updating:\n" + traceback.format_exc())
+        return True
+
+    def update(self):
         mtime = config_mtime()
         if mtime != self.mtime:
             self.mtime = mtime
@@ -182,12 +319,60 @@ class Tray:
         if state not in self.icons:
             state = "off"
         if state != self.last_state:
-            label = next((l for s, _c, l in self.statuses if s == state), "Off")
-            self.ind.set_icon_full(self.icons[state], label)
+            self.ind.set_icon_full(self.icons[state], self.label_of(state))
             self.last_state = state
-        return True
+        self.update_timer()
+        reap_children()
+
+    def update_timer(self):
+        timer = read_timer()
+        if timer != self.timer:
+            # A timer started or stopped: the menu gains or loses its lines.
+            self.timer = timer
+            self.timer_text = None
+            self.build_menu()
+        if not self.timer:
+            if self.timer_text != "":
+                self.ind.set_label("", "")
+                self.timer_text = ""
+            return
+        text, left = self.timer_line()
+        if text != self.timer_text:
+            # Updated in place: rebuilding would close an open menu.
+            if self.timer_item:
+                self.timer_item.set_label(text)
+            self.ind.set_label(human_minutes(left), "00 h 00")
+            self.timer_text = text
+
+
+def main():
+    """One tray per session. A new one (after an upgrade, or started by hand)
+    takes over: the previous one sees the D-Bus name go and quits, so its
+    icon goes away instead of staying behind, frozen."""
+    state = {"tray": None}
+
+    def acquired(_conn, _name):
+        if state["tray"] is None:
+            state["tray"] = Tray()
+
+    def lost(_conn, _name):
+        if state["tray"] is None:
+            log("cannot own the tray bus name — starting anyway")
+            state["tray"] = Tray()
+        else:
+            log("another luxafor-tray took over, quitting")
+            Gtk.main_quit()
+
+    Gio.bus_own_name(
+        Gio.BusType.SESSION,
+        BUS_NAME,
+        Gio.BusNameOwnerFlags.ALLOW_REPLACEMENT | Gio.BusNameOwnerFlags.REPLACE,
+        None,
+        acquired,
+        lost,
+    )
+    Gtk.main()
 
 
 if __name__ == "__main__":
-    Tray()
-    Gtk.main()
+    main()

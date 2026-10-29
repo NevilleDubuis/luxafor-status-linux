@@ -16,22 +16,38 @@ changed by hand during the call.
 .PP
 It is started at login through
 .IR /etc/xdg/autostart/luxafor-callwatch.desktop .
+.PP
+Only one runs per user: a second one leaves right away.
 .SH OPTIONS
 .TP
 .B \-\-check
 Show the applications using the microphone right now, and whether that
 counts as a call. Run it during a call to check the detection.
+.PP
+A timer set with
+.B luxafor-toggle \-\-for
+keeps running during a call. If it ends during the call, the light goes to
+the default status when the call ends.
 .SH CONFIGURATION
+The status used during calls is the
+.B call-status
+setting in
+.I ~/.config/luxafor-status/statuses.conf
+(see
+.BR luxafor-toggle (1)),
+.B call
+by default. It is read at each call.
+.PP
 .I ~/.config/luxafor-status/callwatch.conf
 (optional), one
 .IR key " = " value
 per line:
 .TP
 .B status
-Status id used during calls (default:
-.BR call ).
-Any id listed by
-.BR "luxafor-toggle \-\-list" .
+Older place for the call status, used only when
+.I statuses.conf
+has no
+.BR call-status .
 .TP
 .B apps
 Space-separated names matched against the application name and binary

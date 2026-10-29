@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Luxafor Panel
+GenericName=Status light
+Comment=Choose the Luxafor light status, optionally for a while
+Exec=@BINDIR@/luxafor-panel
+Icon=luxafor-status
+Terminal=false
+Categories=Utility;
+Keywords=luxafor;busylight;status;timer;
+StartupNotify=false

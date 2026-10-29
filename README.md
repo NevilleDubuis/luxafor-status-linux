@@ -6,9 +6,11 @@
 Control a **Luxafor** status light from Ubuntu, with:
 
 - 🖱️ **a dock button** — click to cycle through statuses, right-click to pick one;
+- 🪟 **a quick panel** — big status buttons and one-click durations;
 - 🟢 **a system tray icon** that shows the current color;
 - ⌨️ **a command** — `luxafor-toggle` — for scripts and keyboard shortcuts;
 - 🎨 **your own statuses** — as many as you want, with any name and color;
+- ⏱ **timers** — "busy for 30 minutes", then back to your default status;
 - 📞 **automatic call status** — the light switches to a status of your choice
   while you're in a call in your browser (Teams, Odoo, Google Meet, Jitsi…).
 
@@ -46,8 +48,9 @@ then:
 sudo apt install ./luxafor-status_*_all.deb
 ```
 
-`apt` installs the dependencies, the udev rule and the launcher, and starts the
-tray icon at your next login (or run `luxafor-tray &` right away). To remove it:
+`apt` installs the dependencies, the udev rule and the launchers. The tray icon
+and the call detection start at each login — to start them right away, open
+**Luxafor Panel** from the app menu once (or log out and back in). To remove it:
 `sudo apt remove luxafor-status`.
 
 ### From source
@@ -83,13 +86,31 @@ Options:
 
 ## Usage
 
-- **Dock**: open the app menu, search for "Luxafor" and drag it to your dock or panel.
-- **System tray**: click the dot to pick a status.
+- **System tray**: the dot shows the current color. Right-click it:
+
+  <img src="docs/menu.png" alt="Tray menu: running timer and Cancel timer, then the statuses, the timer shortcuts, Other duration…, Off, Edit statuses…, Quit" width="256">
+
+  - a status in one click;
+  - a timer in one click (`timer-shortcuts`, see [Settings](#settings));
+  - **Other duration…** opens the panel (a middle-click on the dot too);
+  - while a timer runs, the time left shows next to the dot and at the top of
+    the menu, with **Cancel timer**.
+- **Panel**, for any duration: "Luxafor Panel" in the app menu, or **Other
+  duration…** in the tray menu. Pick a duration (∞ = no timer), then click a
+  status. Keys `1`–`9` pick a status, `Esc` closes.
+
+  <img src="docs/panel.png" alt="The Luxafor panel, light: current status and timer, one button per status, durations" width="400"> <img src="docs/panel-dark.png" alt="The same panel in dark mode" width="400">
+
+- **Dock**: "Luxafor" in the app menu — one click goes to the next status.
+  Drag it (or "Luxafor Panel") to your dock.
 - **Terminal**:
 
   ```bash
   luxafor-toggle              # next status
   luxafor-toggle busy         # set a status by its id
+  luxafor-toggle busy --for 30   # for 30 minutes (also 45m, 1h, 1h30), then default status
+  luxafor-toggle --timer      # time left
+  luxafor-toggle --cancel-timer
   luxafor-toggle off
   luxafor-toggle --list       # list your statuses
   luxafor-toggle --current    # print the current status
@@ -140,13 +161,50 @@ you edited the file while the tray icon wasn't running).
 
 Your configuration is kept when you re-run `./install.sh`.
 
+### Settings
+
+The same file holds two settings, as `key = value` lines:
+
+```ini
+# Status to go back to when a timer ends (default: available, or your first status)
+default-status = available
+
+# Status used automatically while you are in a call (default: call)
+call-status = call
+
+# Timers offered in one click in the tray menu: "<status> <duration>",
+# separated by commas (default: your first non-default status, 30 min and 1 h)
+timer-shortcuts = busy 30, busy 1h, focus 1h30
+
+# Look of the panel: auto (default), light or dark
+theme = auto
+```
+
+With `theme = auto`, the panel follows your desktop: a dark GTK theme, or the
+"prefer dark" style setting of GNOME / Budgie, gives a dark panel. `light` and
+`dark` force it (with the standard Adwaita look).
+
+`luxafor-toggle --settings` shows the values in use.
+
+### Timers
+
+`luxafor-toggle busy --for 30` (or a duration in the panel) sets a status
+for a while, then goes back to `default-status` with a notification.
+
+- Choosing another status by hand cancels the timer.
+- A call doesn't: when the call ends, the light goes back to the timed status
+  if the timer is still running, or to `default-status` if it ended during the call.
+- Timers survive suspending the laptop. If you log out before a timer ends, it
+  resumes at your next login (or ends right away if it's already over).
+
 ## Automatic call status
 
 `luxafor-callwatch` starts at login and watches which applications use your
 microphone. When your web browser starts recording — which is what happens when
 you join a call in Teams, Odoo, Google Meet, Jitsi or any other web app — the
-light switches to **On a call**. When the call ends, it goes back to the status
-you had before (unless you changed it yourself during the call).
+light switches to your `call-status` (**On a call** by default — see
+[Settings](#settings)). When the call ends, it goes back to the status you had
+before (unless you changed it yourself during the call).
 
 It works with PipeWire and PulseAudio, needs no browser extension, and keeps
 working when you mute yourself during the call.
@@ -157,12 +215,11 @@ To check what it sees, run this **during a call**:
 luxafor-callwatch --check
 ```
 
-To change its behavior, create `~/.config/luxafor-status/callwatch.conf`:
+To choose the status used during calls, set `call-status` in your
+statuses (`luxafor-toggle --edit`). Other options go in
+`~/.config/luxafor-status/callwatch.conf`:
 
 ```ini
-# Status used during calls — any id from: luxafor-toggle --list
-status = busy
-
 # Apps that count as "in a call" when they use the microphone
 # (matched against the app name; default: common web browsers)
 apps = firefox chrome chromium brave msedge vivaldi opera
@@ -171,7 +228,13 @@ apps = firefox chrome chromium brave msedge vivaldi opera
 enabled = yes
 ```
 
-Then log out and back in (or restart it: `pkill -f luxafor-callwatch; luxafor-callwatch &`).
+Changes to `call-status` apply from the next call. After editing
+`callwatch.conf`, log out and back in (or restart it:
+`pkill -f luxafor-callwatch; luxafor-callwatch &`).
+
+> [!TIP]
+> Versions up to 0.2 read the call status from `status = …` in `callwatch.conf`.
+> That still works, but `call-status` in `statuses.conf` takes precedence.
 
 > [!NOTE]
 > Any recording by a watched app counts as a call — for example a voice message
@@ -188,6 +251,7 @@ Then log out and back in (or restart it: `pkill -f luxafor-callwatch; luxafor-ca
 | A status is missing from the menu | Run `luxafor-toggle --list`: invalid lines in `statuses.conf` are reported there. |
 | `luxafor-light list` shows nothing | Run `lsusb \| grep -i 04d8`. If your light shows a different ID than `04d8:f372`, please open an issue — it's probably a model that isn't supported yet. |
 | No tray icon | Make sure the "System Tray" applet is on your panel. On GNOME, install the *AppIndicator Support* extension. |
+| Tray icon stops updating | Run `luxafor-tray &`: it replaces the running one. Errors are logged to `~/.cache/luxafor-tray.log` — please attach it to an issue. If an old icon stays behind, restart the panel (`budgie-panel --replace &` on Budgie) or log out and back in. |
 | Call status doesn't switch | Run `luxafor-callwatch --check` during the call: is your browser listed? If it has an unusual name, add it to `apps`. If the call detection reports that `pactl` is missing: `sudo apt install pulseaudio-utils`. |
 | `luxafor-toggle: command not found` | Log out and back in so `~/.local/bin` is on your `PATH`. |
 

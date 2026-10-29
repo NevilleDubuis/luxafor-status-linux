@@ -23,6 +23,7 @@ fake_hidraw hidraw1 0003:000004D8:0000F372 "Microchip Technology Inc. LUXAFOR OR
 fake_hidraw hidraw2 0003:000004D8:0000F372 "Microchip Technology Inc. LUXAFOR FLAG"
 
 export LUXAFOR_SYSFS="$TMP/sys" LUXAFOR_DEV="$TMP/dev"
+export XDG_RUNTIME_DIR="$TMP/run"
 export HOME="$TMP/home" XDG_DATA_HOME="$TMP/data" XDG_CONFIG_HOME="$TMP/config" \
        XDG_CACHE_HOME="$TMP/cache" XDG_DATA_DIRS="$TMP/share"
 mkdir -p "$HOME" "$TMP/share/luxafor-status"
@@ -71,12 +72,65 @@ echo "legacy-green" > "$XDG_CACHE_HOME/luxafor-state"
 
 "$TOGGLE" --reload >/dev/null 2>&1
 DESKTOP="$XDG_DATA_HOME/applications/luxafor.desktop"
-eq "launcher has one action per status" "$(sed -n 's/^Actions=//p' "$DESKTOP")" "dispo;focus;pipe;off;"
+eq "launcher: open panel, then one action per status" "$(sed -n 's/^Actions=//p' "$DESKTOP")" "panel;dispo;focus;pipe;off;"
 eq "one icon per status, plus off" "$(find "$XDG_DATA_HOME/luxafor-status/icons" -name "*.svg" | wc -l | tr -d ' ')" 4
 if command -v desktop-file-validate >/dev/null 2>&1; then
     if desktop-file-validate "$DESKTOP"; then ok "launcher passes desktop-file-validate"
     else fail "launcher passes desktop-file-validate"; fi
 fi
+
+echo "editing"
+mkdir -p "$TMP/editbin"
+printf '#!/bin/sh\necho "gui $*" > "%s/edited"\n' "$TMP" > "$TMP/editbin/xdg-open"
+printf '#!/bin/sh\necho "terminal $*" > "%s/edited"\n' "$TMP" > "$TMP/editbin/fake-editor"
+chmod +x "$TMP/editbin/"*
+CONFFILE="$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+if command -v script >/dev/null 2>&1; then
+    # In a terminal (script gives one): --edit uses the terminal editor…
+    PATH="$TMP/editbin:$PATH" EDITOR=fake-editor script -qec "$TOGGLE --edit" /dev/null >/dev/null 2>&1
+    eq "--edit in a terminal → terminal editor" "$(cat "$TMP/edited" 2>/dev/null)" "terminal $CONFFILE"
+    # …but --gui (tray, panel) always opens the desktop editor, even when the
+    # tray was started from a terminal.
+    rm -f "$TMP/edited"
+    # (the sleep keeps the test terminal open while the editor starts)
+    PATH="$TMP/editbin:$PATH" EDITOR=fake-editor script -qec "$TOGGLE --edit --gui; sleep 1" /dev/null >/dev/null 2>&1
+    eq "--edit --gui in a terminal → desktop editor" "$(cat "$TMP/edited" 2>/dev/null)" "gui $CONFFILE"
+fi
+
+echo "timer and settings"
+TIMERF="$XDG_CACHE_HOME/luxafor-timer"
+eq "default status falls back to the first status" "$("$TOGGLE" --setting default-status)" dispo
+"$TOGGLE" focus --for 1h30 >/dev/null 2>&1
+eq "--for 1h30" "$("$TOGGLE" --timer | grep -o '(.*left)')" "(1 h 30 left)"
+"$TOGGLE" --for 45m focus >/dev/null 2>&1
+eq "--for before the status, 45m" "$("$TOGGLE" --timer | grep -o '(.*left)')" "(45 min left)"
+"$TOGGLE" focus --for 0 >/dev/null 2>&1; eq "--for 0 is rejected" "$?" 2
+"$TOGGLE" focus --for soon >/dev/null 2>&1; eq "invalid duration is rejected" "$?" 2
+"$TOGGLE" pipe >/dev/null 2>&1
+eq "a status set by hand cancels the timer" "$("$TOGGLE" --timer)" "No timer."
+short_timer() {  # status seconds
+    "$TOGGLE" "$1" >/dev/null 2>&1
+    echo "$(( $(date +%s) + $2 )) $1" > "$TIMERF"
+    "$TOGGLE" --resume-timer
+}
+short_timer focus 1; sleep 2.5
+eq "timer ends → default status" "$("$TOGGLE" --current)" dispo
+eq "timer file removed" "$([ -f "$TIMERF" ] && echo yes || echo no)" no
+short_timer focus 1; "$TOGGLE" pipe --keep-timer >/dev/null 2>&1; sleep 2.5
+eq "timer ends while another status is on → left alone" "$("$TOGGLE" --current)" pipe
+"$TOGGLE" focus >/dev/null 2>&1; echo "$(( $(date +%s) - 60 )) focus" > "$TIMERF"; "$TOGGLE" --resume-timer
+eq "timer expired while logged out → default status at login" "$("$TOGGLE" --current)" dispo
+"$TOGGLE" focus --for 10 >/dev/null 2>&1; "$TOGGLE" --cancel-timer
+eq "--cancel-timer keeps the status" "$("$TOGGLE" --current) $("$TOGGLE" --timer)" "focus No timer."
+printf 'default-status = pipe\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+eq "default-status setting" "$("$TOGGLE" --setting default-status)" pipe
+eq "settings lines are not statuses" "$("$TOGGLE" --list 2>/dev/null | awk '{print $1}' | paste -sd' ')" "dispo focus pipe off"
+eq "timer shortcuts default: first non-default status, 30 min and 1 h" "$("$TOGGLE" --setting timer-shortcuts | paste -sd,)" "dispo 30,dispo 60"
+printf 'timer-shortcuts = focus 1h30, nope 30, focus soon, pipe 15\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+eq "timer shortcuts: valid entries kept, in order" "$("$TOGGLE" --setting timer-shortcuts | paste -sd,)" "focus 90,pipe 15"
+eq "timer shortcuts: invalid entries reported" "$("$TOGGLE" --settings 2>&1 >/dev/null | grep -c 'ignoring timer shortcut')" 2
+printf 'timer-shortcuts =\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+eq "timer shortcuts: empty setting → none" "$("$TOGGLE" --setting timer-shortcuts)" ""
 
 echo "luxafor-callwatch"
 # Fake pactl: "list source-outputs" prints $TMP/streams, "subscribe" reads
@@ -96,6 +150,13 @@ stream() {  # id app-name binary
 }
 event() { echo "Event '$1' on source-output #$2" >&3; sleep 0.5; }
 WATCH="$ROOT/bin/luxafor-callwatch"
+# Stops the watcher and its fake "pactl subscribe", which would otherwise
+# keep reading (and stealing) events from the FIFO.
+stop_watch() {
+    kill "$WATCH_PID" 2>/dev/null
+    pkill -f "cat $TMP/events" 2>/dev/null
+    exec 3>&-
+}
 export PATH="$TMP/fakebin:$PATH" LUXAFOR_CALL_END_DELAY=1
 printf 'status = focus   # blue during calls\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
 
@@ -108,8 +169,13 @@ eq "--check detects a browser" "$("$WATCH" --check | tail -1)" "→ This counts 
 "$TOGGLE" dispo >/dev/null 2>&1
 exec 3<>"$TMP/events"
 "$WATCH" 2>/dev/null & WATCH_PID=$!
-trap 'kill "$WATCH_PID" 2>/dev/null; rm -rf "$TMP"' EXIT
+trap 'stop_watch; rm -rf "$TMP"' EXIT
 sleep 0.5
+
+"$WATCH" 2>"$TMP/second.err"
+eq "a second watcher leaves at once" "$?" 0
+eq "…saying the first one is running" "$(grep -c 'already running' "$TMP/second.err")" 1
+eq "…and the first one keeps going" "$(kill -0 "$WATCH_PID" 2>/dev/null && echo yes || echo no)" yes
 
 stream 52 "Google Chrome" chrome > "$TMP/streams"; event new 52
 eq "call starts → configured status" "$("$TOGGLE" --current)" focus
@@ -125,11 +191,41 @@ stream 60 Firefox firefox > "$TMP/streams"; event new 60
 : > "$TMP/streams"; event remove 60; sleep 1.5
 eq "status changed during the call is kept" "$("$TOGGLE" --current)" pipe
 
-kill "$WATCH_PID" 2>/dev/null; exec 3>&-
+stop_watch
 printf 'status = nope\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
 "$WATCH" 2>/dev/null; eq "unknown call status exits 1" "$?" 1
 printf 'enabled = no\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
 "$WATCH" 2>/dev/null; eq "enabled = no exits cleanly" "$?" 0
+
+
+echo "luxafor-callwatch with settings and timers"
+cat > "$XDG_CONFIG_HOME/luxafor-status/statuses.conf" <<'CONF'
+dispo | lime    | Disponible
+focus | #0000ff | Focus
+tel   | purple  | Au téléphone
+default-status = dispo
+call-status    = tel
+CONF
+printf 'status = focus\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"   # legacy, overridden
+: > "$TMP/streams"
+exec 3<>"$TMP/events"
+"$WATCH" 2>/dev/null & WATCH_PID=$!
+sleep 0.5
+"$TOGGLE" focus --for 30 >/dev/null 2>&1
+stream 80 Firefox firefox > "$TMP/streams"; event new 80
+eq "call-status from statuses.conf wins" "$("$TOGGLE" --current)" tel
+eq "a call doesn't cancel the timer" "$([ -f "$TIMERF" ] && echo yes || echo no)" yes
+: > "$TMP/streams"; event remove 80; sleep 1.5
+eq "call ends, timer still running → back to the timed status" "$("$TOGGLE" --current)" focus
+eq "…and the timer keeps running" "$([ -f "$TIMERF" ] && echo yes || echo no)" yes
+short_timer focus 2
+stream 81 Firefox firefox > "$TMP/streams"; event new 81
+sleep 2.5
+eq "timer ends during a call → call status kept" "$("$TOGGLE" --current)" tel
+: > "$TMP/streams"; event remove 81; sleep 1.5
+eq "call ends after the timer → default status" "$("$TOGGLE" --current)" dispo
+stop_watch
+"$TOGGLE" --cancel-timer
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

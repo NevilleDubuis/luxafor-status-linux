@@ -26,9 +26,10 @@ Running `luxafor-toggle` from a terminal usually prints a useful error message.
 
    ```bash
    tests/run.sh                 # driver and statuses, no light needed
+   xvfb-run -a dbus-run-session -- tests/ui.py   # panel and tray
    shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle \
               bin/luxafor-callwatch packaging/build-deb.sh tests/run.sh
-   python3 -m py_compile bin/luxafor-tray
+   python3 -m py_compile bin/luxafor-tray bin/luxafor-panel
    ```
 
 4. Test `./install.sh` and `./uninstall.sh` on your machine if you touched them.
@@ -55,6 +56,11 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
+For a pre-release, add a suffix: `v0.3.0-beta.1`, `v0.3.0-rc.1`. It is
+published as a GitHub pre-release (so "Latest" keeps pointing to the last
+stable version) and the package version becomes `0.3.0~beta.1`, which apt
+sorts before `0.3.0`. Tags that aren't `vX.Y.Z[-suffix]` are rejected.
+
 ## Project layout
 
 ```
@@ -63,6 +69,7 @@ bin/luxafor-toggle     sets or cycles the status (calls luxafor-light), and gene
                        the status icons and the dock launcher (--reload)
 bin/luxafor-tray       tray icon showing the current status (Python + AppIndicator)
 bin/luxafor-callwatch  call detection: watches microphone streams with `pactl`
+bin/luxafor-panel      quick panel (Python + GTK 3); runs luxafor-toggle for every action
 share/statuses.conf    default status configuration
 share/icons/           application icon (luxafor-status)
 share/applications/    autostart templates (@BINDIR@ is replaced at install time)
@@ -71,19 +78,28 @@ install.sh             per-user installer (from source)
 uninstall.sh           uninstaller for the per-user install
 packaging/             .deb build script, man pages, AppStream metadata
 tests/run.sh           tests with a fake light
+tests/ui.py            panel and tray tests, under a virtual display
+docs/                  README images
 .github/workflows/     CI (checks + package build) and releases
 ```
 
 Runtime files:
 
 - `~/.config/luxafor-status/statuses.conf` — the user's statuses
-  (`id | color | label`). `luxafor-toggle` and `luxafor-tray` both parse it and
-  must stay in sync if the format changes.
+  (`id | color | label`) and settings (`key = value`: `default-status`,
+  `call-status`, `timer-shortcuts`, `theme`). `luxafor-toggle` and `luxafor-tray` both parse the statuses
+  and must stay in sync if the format changes; other tools read settings with
+  `luxafor-toggle --setting <key>`.
 - `~/.config/luxafor-status/callwatch.conf` — optional call detection
-  settings (`status`, `apps`, `enabled`).
+  settings (`apps`, `enabled`; `status` is the legacy call status).
 - `~/.cache/luxafor-state` — the current status id. The tray icon polls it
   (and the config file's modification time) every second, so any tool that
   calls `luxafor-toggle` keeps the tray in sync.
+- `~/.cache/luxafor-timer` — the running timer, `<end epoch> <status id>`.
+  A background `luxafor-toggle --timer-expire` process ends it; it checks the
+  wall clock every 20 s so suspend doesn't delay it, and exits as soon as the
+  file changes (status set by hand, new timer, cancel). `--keep-timer` (used
+  by `luxafor-callwatch`) sets a status without cancelling the timer.
 - `~/.local/share/luxafor-status/icons/` — one generated SVG per status (notifications).
 - `~/.local/share/icons/lxftray-<id>-<hash>.svg` — tray icons, written by
   `luxafor-tray`. They live in the standard icon folder because some tray hosts

@@ -18,14 +18,15 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq shellcheck lintian appstream desktop-file-utils \
-            python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1
+            python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 \
+            xvfb dbus librsvg2-common
 
       - name: ShellCheck
         run: shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle bin/luxafor-callwatch packaging/build-deb.sh tests/run.sh
 
       - name: Python
         run: |
-          python3 -m py_compile bin/luxafor-tray
+          python3 -m py_compile bin/luxafor-tray bin/luxafor-panel tests/ui.py
           # Load the tray with the real GTK / AppIndicator bindings (no main loop).
           /usr/bin/python3 - <<'EOF'
           src = open("bin/luxafor-tray").read().replace('if __name__ == "__main__":', "if False:")
@@ -34,6 +35,9 @@ jobs:
 
       - name: Tests
         run: tests/run.sh
+
+      - name: UI tests (panel and tray, virtual display)
+        run: xvfb-run -a dbus-run-session -- /usr/bin/python3 tests/ui.py --screenshot panel.png
 
       - name: Build .deb
         run: packaging/build-deb.sh "0.0.0~ci${GITHUB_RUN_NUMBER}"
@@ -54,3 +58,8 @@ jobs:
         with:
           name: luxafor-status-deb
           path: dist/*.deb
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: panel-screenshot
+          path: panel.png
