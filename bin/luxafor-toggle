@@ -196,19 +196,26 @@ reload() {
     return 0
 }
 
+# edit_config [--gui]: an editor in the terminal, or the desktop's text
+# editor with --gui (what the tray and the panel use) or without a terminal.
 edit_config() {
     if [ ! -f "$CONF" ]; then
         mkdir -p "$(dirname "$CONF")"
         if [ -f "$DEFAULT_CONF" ]; then cp "$DEFAULT_CONF" "$CONF"
         else die "default configuration not found — re-run install.sh"; fi
     fi
-    if [ -t 0 ] && [ -t 1 ]; then
+    if [ "${1:-}" != --gui ] && [ -t 0 ] && [ -t 1 ]; then
         "${VISUAL:-${EDITOR:-nano}}" "$CONF"
         VERBOSE=1; load_statuses; reload
         echo "Statuses reloaded."
     else
-        # Opened from the tray: the tray reloads automatically once the file is saved.
-        xdg-open "$CONF" >/dev/null 2>&1 &
+        # Desktop editor, fully detached so it outlives this command and its
+        # terminal. The tray reloads automatically once the file is saved.
+        if command -v setsid >/dev/null 2>&1; then
+            setsid xdg-open "$CONF" >/dev/null 2>&1 < /dev/null &
+        else
+            nohup xdg-open "$CONF" >/dev/null 2>&1 < /dev/null &
+        fi
     fi
 }
 
@@ -309,7 +316,7 @@ case "${1:-}" in
     -h|--help)
         sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     --edit)
-        edit_config; exit 0 ;;
+        edit_config "${2:-}"; exit 0 ;;
 esac
 
 VERBOSE=0

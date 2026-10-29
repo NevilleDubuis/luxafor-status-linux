@@ -122,7 +122,10 @@ class Panel(Gtk.ApplicationWindow):
     def __init__(self, app, run=None):
         super().__init__(application=app, title="Luxafor")
         # run(args): how commands are executed — replaced in tests.
-        self.run = run or (lambda args: subprocess.Popen([TOGGLE, *args]))
+        # Detached from any terminal (see spawn() in luxafor-tray).
+        self.run = run or (lambda args: subprocess.Popen(
+            [TOGGLE, *args], stdin=subprocess.DEVNULL, start_new_session=True
+        ))
         self.statuses = load_statuses()
         self.current = (toggle_output("--current").strip() or "off")
         self.minutes = None
@@ -285,7 +288,7 @@ class Panel(Gtk.ApplicationWindow):
         self.close()
 
     def on_edit(self, _button):
-        self.run(["--edit"])
+        self.run(["--edit", "--gui"])
         self.close()
         return True  # handled: don't open a URI
 

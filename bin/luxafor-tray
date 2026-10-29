@@ -152,7 +152,12 @@ def spawn(*args):
     behind as a zombie process of the tray.
     """
     try:
-        _children.append(subprocess.Popen(list(args)))
+        # Detached from any terminal the tray was started from: otherwise a
+        # child touching that terminal gets suspended by the shell's job
+        # control, and whatever waits for it with it.
+        _children.append(subprocess.Popen(
+            list(args), stdin=subprocess.DEVNULL, start_new_session=True
+        ))
     except OSError as e:
         print(f"luxafor-tray: cannot run {args[0]}: {e}", file=sys.stderr)
 
@@ -288,7 +293,7 @@ class Tray:
         add("Off", ["off"])
         separator()
 
-        add("Edit statuses…", ["--edit"])
+        add("Edit statuses…", ["--edit", "--gui"])
         add("Quit", action=Gtk.main_quit)
         menu.show_all()
         self.ind.set_menu(menu)

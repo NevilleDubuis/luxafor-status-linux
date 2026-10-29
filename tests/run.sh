@@ -78,6 +78,24 @@ if command -v desktop-file-validate >/dev/null 2>&1; then
     else fail "launcher passes desktop-file-validate"; fi
 fi
 
+echo "editing"
+mkdir -p "$TMP/editbin"
+printf '#!/bin/sh\necho "gui $*" > "%s/edited"\n' "$TMP" > "$TMP/editbin/xdg-open"
+printf '#!/bin/sh\necho "terminal $*" > "%s/edited"\n' "$TMP" > "$TMP/editbin/fake-editor"
+chmod +x "$TMP/editbin/"*
+CONFFILE="$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+if command -v script >/dev/null 2>&1; then
+    # In a terminal (script gives one): --edit uses the terminal editor…
+    PATH="$TMP/editbin:$PATH" EDITOR=fake-editor script -qec "$TOGGLE --edit" /dev/null >/dev/null 2>&1
+    eq "--edit in a terminal → terminal editor" "$(cat "$TMP/edited" 2>/dev/null)" "terminal $CONFFILE"
+    # …but --gui (tray, panel) always opens the desktop editor, even when the
+    # tray was started from a terminal.
+    rm -f "$TMP/edited"
+    # (the sleep keeps the test terminal open while the editor starts)
+    PATH="$TMP/editbin:$PATH" EDITOR=fake-editor script -qec "$TOGGLE --edit --gui; sleep 1" /dev/null >/dev/null 2>&1
+    eq "--edit --gui in a terminal → desktop editor" "$(cat "$TMP/edited" 2>/dev/null)" "gui $CONFFILE"
+fi
+
 echo "timer and settings"
 TIMERF="$XDG_CACHE_HOME/luxafor-timer"
 eq "default status falls back to the first status" "$("$TOGGLE" --setting default-status)" dispo
