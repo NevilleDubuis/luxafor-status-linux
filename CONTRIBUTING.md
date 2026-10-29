@@ -55,6 +55,11 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
+For a pre-release, add a suffix: `v0.3.0-beta.1`, `v0.3.0-rc.1`. It is
+published as a GitHub pre-release (so "Latest" keeps pointing to the last
+stable version) and the package version becomes `0.3.0~beta.1`, which apt
+sorts before `0.3.0`. Tags that aren't `vX.Y.Z[-suffix]` are rejected.
+
 ## Project layout
 
 ```

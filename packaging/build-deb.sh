@@ -24,6 +24,10 @@ if [ -z "$VERSION" ]; then
     VERSION="${VERSION:-0.0.0~dev}"
 fi
 VERSION="${VERSION#v}"
+# Pre-releases: semver "0.3.0-beta.1" becomes Debian "0.3.0~beta.1". In a
+# Debian version, "-" starts a packaging revision, and "~" sorts before
+# anything, so the final 0.3.0 is seen as newer than its betas.
+VERSION="${VERSION/-/\~}"
 [[ "$VERSION" =~ ^[0-9][A-Za-z0-9.+~-]*$ ]] || { echo "Invalid version: $VERSION" >&2; exit 2; }
 OUT="${2:-$ROOT/dist}"
 
