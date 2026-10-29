@@ -127,7 +127,8 @@ Done ✔
   • App menu → "Luxafor": drag it to your dock (click = next status)
   • System tray: the dot shows the current color (click = menu)
   • Terminal: luxafor-toggle --list
-  • Customize statuses: luxafor-toggle --edit
+  • Customize statuses and settings: luxafor-toggle --edit
+  • Timer: luxafor-toggle busy --for 30 (or "Set for…" in the tray menu)
   • Call detection: luxafor-callwatch --check (during a call)
 
 Uninstall: ./uninstall.sh

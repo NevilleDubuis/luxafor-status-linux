@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 # luxafor-toggle — set the status of a Luxafor light.
 #
-#   luxafor-toggle            cycle: first status → … → last status → off
-#   luxafor-toggle <id>       set a status by its id (see --list), or "off"
-#   luxafor-toggle --list     list configured statuses
-#   luxafor-toggle --current  print the current status id
-#   luxafor-toggle --edit     edit the status configuration
-#   luxafor-toggle --reload   regenerate icons and launcher after editing
+#   luxafor-toggle                  cycle: first status → … → last status → off
+#   luxafor-toggle <id>             set a status by its id (see --list), or "off"
+#   luxafor-toggle <id> --for 30    set a status for 30 minutes (also 45m, 1h, 1h30),
+#                                   then go back to the default status
+#   luxafor-toggle --timer          show the running timer
+#   luxafor-toggle --cancel-timer   stop the timer, keep the current status
+#   luxafor-toggle --list           list configured statuses
+#   luxafor-toggle --settings       show the settings (default and call status)
+#   luxafor-toggle --current        print the current status id
+#   luxafor-toggle --edit           edit the status configuration
+#   luxafor-toggle --reload         regenerate icons and launcher after editing
 set -u
 
 BINDIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
@@ -28,6 +33,9 @@ find_default_conf() {
 }
 DEFAULT_CONF="$(find_default_conf)"
 STATE="$CACHE_HOME/luxafor-state"
+# Running timer: "<end epoch> <status id>". Removed when the timer ends or
+# when the status is changed by hand.
+TIMER="$CACHE_HOME/luxafor-timer"
 ICON_DIR="$DATA_HOME/luxafor-status/icons"
 DESKTOP_FILE="$DATA_HOME/applications/luxafor.desktop"
 OFF_COLOR="#9e9e9e"
@@ -43,19 +51,30 @@ notify() {
 
 die() { echo "luxafor-toggle: $1" >&2; notify "$1"; exit "${2:-1}"; }
 
-# Loads statuses into IDS / COLORS / LABELS (parallel arrays).
+# Loads statuses into IDS / COLORS / LABELS (parallel arrays), and the
+# settings ("key = value" lines) into SET_DEFAULT / SET_CALL.
 load_statuses() {
-    IDS=(); COLORS=(); LABELS=()
-    local file="$CONF" line id color label n=0
+    IDS=(); COLORS=(); LABELS=(); SET_DEFAULT=""; SET_CALL=""
+    local file="$CONF" line id color label key value n=0
     [ -f "$file" ] || file="$DEFAULT_CONF"
     if [ ! -f "$file" ]; then
         IDS=(available busy call); COLORS=(green red yellow)
-        LABELS=("Available" "Busy" "On a call"); return
+        LABELS=("Available" "Busy" "On a call"); resolve_settings; return
     fi
     while IFS= read -r line || [ -n "$line" ]; do
         n=$((n + 1))
         line="$(trim "$line")"
         case "$line" in ''|\#*) continue ;; esac
+        if [[ "$line" != *"|"* && "$line" == *"="* ]]; then
+            key="$(trim "${line%%=*}")"; value="$(trim "${line#*=}")"
+            value="$(trim "${value%%#*}")"
+            case "$key" in
+                default-status) SET_DEFAULT="$value" ;;
+                call-status)    SET_CALL="$value" ;;
+                *) [ "$VERBOSE" -eq 1 ] && echo "luxafor-toggle: unknown setting '$key' on line $n in $file" >&2 ;;
+            esac
+            continue
+        fi
         IFS='|' read -r id color label <<< "$line"
         id="$(trim "$id")"; color="$(trim "${color:-}")"; label="$(trim "${label:-}")"
         if ! [[ "$id" =~ ^[a-z0-9_-]+$ ]] || [ "$id" = off ] || [ -z "$color" ]; then
@@ -65,6 +84,28 @@ load_statuses() {
         IDS+=("$id"); COLORS+=("$color"); LABELS+=("${label:-$id}")
     done < "$file"
     [ "${#IDS[@]}" -gt 0 ] || die "no valid status in $file"
+    resolve_settings
+}
+
+# DEFAULT_STATUS: where a timer goes back to — the "default-status" setting,
+# else "available", else the first status.
+resolve_settings() {
+    if [ -n "$SET_DEFAULT" ] && { [ "$SET_DEFAULT" = off ] || index_of "$SET_DEFAULT" >/dev/null; }; then
+        DEFAULT_STATUS="$SET_DEFAULT"
+    else
+        if [ -n "$SET_DEFAULT" ] && [ "$VERBOSE" -eq 1 ]; then
+            echo "luxafor-toggle: default-status '$SET_DEFAULT' is not one of your statuses" >&2
+        fi
+        if index_of available >/dev/null; then DEFAULT_STATUS=available; else DEFAULT_STATUS="${IDS[0]}"; fi
+    fi
+    if [ -n "$SET_CALL" ] && ! index_of "$SET_CALL" >/dev/null && [ "$VERBOSE" -eq 1 ]; then
+        echo "luxafor-toggle: call-status '$SET_CALL' is not one of your statuses" >&2
+    fi
+}
+
+label_of() {
+    local i
+    if [ "$1" = off ]; then echo Off; elif i="$(index_of "$1")"; then echo "${LABELS[$i]}"; else echo "$1"; fi
 }
 
 index_of() {
@@ -133,33 +174,163 @@ edit_config() {
     fi
 }
 
+# --- timer --------------------------------------------------------------------
+
+# Prints a duration in seconds: 30 (minutes), 30m, 45min, 1h, 1h30, 1h30m.
+parse_duration() {
+    local d m=0
+    d="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+    if   [[ "$d" =~ ^([0-9]+)(m|min)?$ ]];                then m=$((10#${BASH_REMATCH[1]}))
+    elif [[ "$d" =~ ^([0-9]+)h$ ]];                       then m=$((10#${BASH_REMATCH[1]} * 60))
+    elif [[ "$d" =~ ^([0-9]+)h([0-9]+)(m|min)?$ ]];       then m=$((10#${BASH_REMATCH[1]} * 60 + 10#${BASH_REMATCH[2]}))
+    else return 1; fi
+    [ "$m" -ge 1 ] && [ "$m" -le 1440 ] || return 1
+    echo $((m * 60))
+}
+
+human_minutes() {  # seconds → "25 min" / "1 h" / "1 h 30"
+    local m=$(( ($1 + 59) / 60 ))
+    if [ "$m" -lt 60 ]; then echo "$m min"
+    elif [ $((m % 60)) -eq 0 ]; then echo "$((m / 60)) h"
+    else printf '%d h %02d\n' $((m / 60)) $((m % 60)); fi
+}
+
+# Starts the background process that ends the timer. It sleeps in short
+# steps against the wall clock, so a suspended laptop doesn't delay it.
+start_timer_watcher() {
+    local token="$1"
+    stop_timer_watchers
+    if command -v setsid >/dev/null 2>&1; then
+        setsid "$BINDIR/luxafor-toggle" --timer-expire "$token" >/dev/null 2>&1 < /dev/null &
+    else
+        nohup "$BINDIR/luxafor-toggle" --timer-expire "$token" >/dev/null 2>&1 < /dev/null &
+    fi
+}
+
+stop_timer_watchers() {
+    pkill -u "$(id -u)" -f "^[^ ]*bash $BINDIR/luxafor-toggle --timer-expire" >/dev/null 2>&1 || true
+}
+
+timer_expire() {
+    local token="$1" end status now
+    read -r end status <<< "$token"
+    while :; do
+        [ "$(cat "$TIMER" 2>/dev/null)" = "$token" ] || exit 0   # cancelled or replaced
+        now="$(date +%s)"
+        [ "$now" -lt "$end" ] || break
+        sleep $(( end - now < 20 ? end - now : 20 ))
+    done
+    finish_timer "$token"
+}
+
+# Ends a timer: back to the default status if the timer's status is still on.
+# If another status took over (a call, for instance), leave it alone:
+# luxafor-callwatch goes back to the default status itself after the call.
+finish_timer() {
+    local end status
+    read -r end status <<< "$1"
+    [ "$(cat "$TIMER" 2>/dev/null)" = "$1" ] || return 0
+    rm -f "$TIMER"
+    if [ "$(cat "$STATE" 2>/dev/null || echo off)" = "$status" ]; then
+        set_status "$DEFAULT_STATUS" "Timer ended — $(label_of "$DEFAULT_STATUS")"
+    fi
+}
+
+show_timer() {
+    local end status now
+    if ! read -r end status 2>/dev/null < "$TIMER"; then echo "No timer."; return; fi
+    now="$(date +%s)"
+    printf '%s until %s (%s left), then %s\n' "$(label_of "$status")" \
+        "$(date -d "@$end" +%H:%M)" "$(human_minutes $(( end > now ? end - now : 0 )))" \
+        "$(label_of "$DEFAULT_STATUS")"
+}
+
+# --- setting a status ---------------------------------------------------------
+
+# set_status <id> [notification text]
+set_status() {
+    local id="$1" i label
+    find_driver
+    if [ "$id" = off ]; then
+        ERR="$("$LIGHT" off 2>&1)" || die "${ERR#luxafor-light: }"
+    else
+        i="$(index_of "$id")"
+        ERR="$("$LIGHT" "${COLORS[$i]}" 2>&1)" || die "${ERR#luxafor-light: }"
+    fi
+    label="${2:-$(label_of "$id")}"
+    mkdir -p "$(dirname "$STATE")"
+    echo "$id" > "$STATE"
+    local icon="$ICON_DIR/luxafor-$id.svg"
+    [ -f "$icon" ] || icon=luxafor-status
+    notify "$label" "$icon"
+}
+
 # --- main ---------------------------------------------------------------------
 
 case "${1:-}" in
     -h|--help)
-        sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     --edit)
         edit_config; exit 0 ;;
 esac
 
 VERBOSE=0
-case "${1:-}" in --list|--reload) VERBOSE=1 ;; esac
+case "${1:-}" in --list|--reload|--settings) VERBOSE=1 ;; esac
 load_statuses
 
-case "${1:-}" in
-    --list)
-        for i in "${!IDS[@]}"; do printf '%-12s %-10s %s\n' "${IDS[$i]}" "${COLORS[$i]}" "${LABELS[$i]}"; done
-        printf '%-12s %-10s %s\n' off - Off
-        exit 0 ;;
-    --current)
-        cat "$STATE" 2>/dev/null || echo off; exit 0 ;;
-    --reload)
-        reload; echo "Statuses reloaded."; exit 0 ;;
-    -*)
-        echo "Unknown option: $1 (see --help)" >&2; exit 2 ;;
-esac
+# Options can come before or after the status id.
+NEXT=""; DURATION=""; KEEP_TIMER=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --list)
+            for i in "${!IDS[@]}"; do printf '%-12s %-10s %s\n' "${IDS[$i]}" "${COLORS[$i]}" "${LABELS[$i]}"; done
+            printf '%-12s %-10s %s\n' off - Off
+            exit 0 ;;
+        --current)
+            cat "$STATE" 2>/dev/null || echo off; exit 0 ;;
+        --reload)
+            reload; echo "Statuses reloaded."; exit 0 ;;
+        --settings)
+            echo "default-status = $DEFAULT_STATUS"
+            echo "call-status    = ${SET_CALL:-(not set — see luxafor-callwatch)}"
+            exit 0 ;;
+        --setting)
+            case "${2:-}" in
+                default-status) echo "$DEFAULT_STATUS" ;;
+                call-status) [ -n "$SET_CALL" ] && echo "$SET_CALL" ;;
+                *) echo "Unknown setting '${2:-}'" >&2; exit 2 ;;
+            esac
+            exit 0 ;;
+        --timer)
+            show_timer; exit 0 ;;
+        --cancel-timer)
+            if [ -f "$TIMER" ]; then rm -f "$TIMER"; stop_timer_watchers; notify "Timer cancelled"; fi
+            exit 0 ;;
+        --resume-timer)   # at login: restart the watcher, or end an expired timer
+            if read -r end _ 2>/dev/null < "$TIMER"; then
+                if [ "$end" -le "$(date +%s)" ]; then finish_timer "$(cat "$TIMER")"
+                else start_timer_watcher "$(cat "$TIMER")"; fi
+            fi
+            exit 0 ;;
+        --timer-expire)   # internal
+            timer_expire "${2:-}"; exit 0 ;;
+        --keep-timer)     # internal, used by luxafor-callwatch
+            KEEP_TIMER=1; shift ;;
+        --for)
+            [ -n "${2:-}" ] || { echo "--for needs a duration, e.g. --for 30" >&2; exit 2; }
+            DURATION="$2"; shift 2 ;;
+        --for=*)
+            DURATION="${1#--for=}"; shift ;;
+        -*)
+            echo "Unknown option: $1 (see --help)" >&2; exit 2 ;;
+        *)
+            [ -z "$NEXT" ] || { echo "Only one status at a time (got '$NEXT' and '$1')" >&2; exit 2; }
+            NEXT="$1"; shift ;;
+    esac
+done
 
-if [ -z "${1:-}" ]; then
+if [ -z "$NEXT" ]; then
+    [ -z "$DURATION" ] || { echo "--for needs a status, e.g. luxafor-toggle busy --for 30" >&2; exit 2; }
     CUR="$(cat "$STATE" 2>/dev/null || echo off)"
     if [ "$CUR" = off ] || ! i="$(index_of "$CUR")"; then
         NEXT="${IDS[0]}"
@@ -168,28 +339,21 @@ if [ -z "${1:-}" ]; then
     else
         NEXT=off
     fi
-else
-    NEXT="$1"
-    if [ "$NEXT" != off ] && ! index_of "$NEXT" >/dev/null; then
-        echo "Unknown status '$NEXT'. Available: ${IDS[*]} off" >&2
-        exit 2
-    fi
+elif [ "$NEXT" != off ] && ! index_of "$NEXT" >/dev/null; then
+    echo "Unknown status '$NEXT'. Available: ${IDS[*]} off" >&2
+    exit 2
 fi
 
-find_driver
-
-if [ "$NEXT" = off ]; then
-    ERR="$("$LIGHT" off 2>&1)" || die "${ERR#luxafor-light: }"
-    LABEL="Off"
+if [ -n "$DURATION" ]; then
+    SECS="$(parse_duration "$DURATION")" \
+        || { echo "Invalid duration '$DURATION' — use minutes (30), or 45m, 1h, 1h30 (max 24h)" >&2; exit 2; }
+    END=$(( $(date +%s) + SECS ))
+    set_status "$NEXT" "$(label_of "$NEXT") for $(human_minutes "$SECS") — until $(date -d "@$END" +%H:%M)"
+    mkdir -p "$(dirname "$TIMER")"
+    echo "$END $NEXT" > "$TIMER"
+    start_timer_watcher "$END $NEXT"
 else
-    i="$(index_of "$NEXT")"
-    ERR="$("$LIGHT" "${COLORS[$i]}" 2>&1)" || die "${ERR#luxafor-light: }"
-    LABEL="${LABELS[$i]}"
+    # A status chosen by hand replaces any running timer.
+    if [ "$KEEP_TIMER" -eq 0 ] && [ -f "$TIMER" ]; then rm -f "$TIMER"; stop_timer_watchers; fi
+    set_status "$NEXT"
 fi
-
-mkdir -p "$(dirname "$STATE")"
-echo "$NEXT" > "$STATE"
-
-ICON="$ICON_DIR/luxafor-$NEXT.svg"
-[ -f "$ICON" ] || ICON=luxafor-status
-notify "$LABEL" "$ICON"

@@ -6,7 +6,12 @@ luxafor-toggle \- set or cycle the status shown by a Luxafor light
 .RI [ id " | " off ]
 .br
 .B luxafor-toggle
-.RB [ \-\-list " | " \-\-current " | " \-\-edit " | " \-\-reload ]
+.I id
+.B \-\-for
+.I duration
+.br
+.B luxafor-toggle
+.RB [ \-\-timer " | " \-\-cancel\-timer " | " \-\-list " | " \-\-settings " | " \-\-current " | " \-\-edit " | " \-\-reload ]
 .SH DESCRIPTION
 Without arguments,
 .B luxafor-toggle
@@ -15,6 +20,28 @@ With a status
 .IR id ,
 it sets that status. A desktop notification shows the new status.
 .SH OPTIONS
+.TP
+.BI \-\-for " duration"
+Set the status for a while, then go back to the default status.
+.I duration
+is in minutes
+.RB ( 30 ),
+or written as
+.BR 45m ", " 1h ", " 1h30
+(at most 24 hours). Setting a status without
+.B \-\-for
+cancels a running timer; a call detected by
+.BR luxafor-callwatch (1)
+does not.
+.TP
+.B \-\-timer
+Show the running timer and the time left.
+.TP
+.B \-\-cancel\-timer
+Stop the timer and keep the current status.
+.TP
+.B \-\-settings
+Show the settings in use.
 .TP
 .B \-\-list
 List the configured statuses.
@@ -52,6 +79,21 @@ is anything
 accepts.
 .I label
 is shown in menus and notifications.
+.PP
+Settings are
+.IR "key " = " value"
+lines in the same file:
+.TP
+.B default-status
+Status a timer goes back to (default:
+.BR available ,
+or the first status).
+.TP
+.B call-status
+Status used during calls by
+.BR luxafor-callwatch (1)
+(default:
+.BR call ).
 .SH FILES
 .TP
 .I ~/.config/luxafor-status/statuses.conf
@@ -62,6 +104,9 @@ Default statuses, used when you have none.
 .TP
 .I ~/.cache/luxafor-state
 The current status.
+.TP
+.I ~/.cache/luxafor-timer
+The running timer.
 .SH SEE ALSO
 .BR luxafor-light (1),
 .BR luxafor-tray (1)

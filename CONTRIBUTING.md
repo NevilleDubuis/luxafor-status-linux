@@ -77,13 +77,20 @@ tests/run.sh           tests with a fake light
 Runtime files:
 
 - `~/.config/luxafor-status/statuses.conf` — the user's statuses
-  (`id | color | label`). `luxafor-toggle` and `luxafor-tray` both parse it and
-  must stay in sync if the format changes.
+  (`id | color | label`) and settings (`key = value`: `default-status`,
+  `call-status`). `luxafor-toggle` and `luxafor-tray` both parse the statuses
+  and must stay in sync if the format changes; other tools read settings with
+  `luxafor-toggle --setting <key>`.
 - `~/.config/luxafor-status/callwatch.conf` — optional call detection
-  settings (`status`, `apps`, `enabled`).
+  settings (`apps`, `enabled`; `status` is the legacy call status).
 - `~/.cache/luxafor-state` — the current status id. The tray icon polls it
   (and the config file's modification time) every second, so any tool that
   calls `luxafor-toggle` keeps the tray in sync.
+- `~/.cache/luxafor-timer` — the running timer, `<end epoch> <status id>`.
+  A background `luxafor-toggle --timer-expire` process ends it; it checks the
+  wall clock every 20 s so suspend doesn't delay it, and exits as soon as the
+  file changes (status set by hand, new timer, cancel). `--keep-timer` (used
+  by `luxafor-callwatch`) sets a status without cancelling the timer.
 - `~/.local/share/luxafor-status/icons/` — one generated SVG per status (notifications).
 - `~/.local/share/icons/lxftray-<id>-<hash>.svg` — tray icons, written by
   `luxafor-tray`. They live in the standard icon folder because some tray hosts

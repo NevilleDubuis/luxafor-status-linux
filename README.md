@@ -9,6 +9,7 @@ Control a **Luxafor** status light from Ubuntu, with:
 - 🟢 **a system tray icon** that shows the current color;
 - ⌨️ **a command** — `luxafor-toggle` — for scripts and keyboard shortcuts;
 - 🎨 **your own statuses** — as many as you want, with any name and color;
+- ⏱ **timers** — "busy for 30 minutes", then back to your default status;
 - 📞 **automatic call status** — the light switches to a status of your choice
   while you're in a call in your browser (Teams, Odoo, Google Meet, Jitsi…).
 
@@ -84,12 +85,17 @@ Options:
 ## Usage
 
 - **Dock**: open the app menu, search for "Luxafor" and drag it to your dock or panel.
-- **System tray**: click the dot to pick a status.
+- **System tray**: click the dot to pick a status, or **Set for…** to set one
+  for a while (15 min to 2 h). While a timer runs, the time left shows next to
+  the dot and at the top of the menu, with **Cancel timer**.
 - **Terminal**:
 
   ```bash
   luxafor-toggle              # next status
   luxafor-toggle busy         # set a status by its id
+  luxafor-toggle busy --for 30   # for 30 minutes (also 45m, 1h, 1h30), then default status
+  luxafor-toggle --timer      # time left
+  luxafor-toggle --cancel-timer
   luxafor-toggle off
   luxafor-toggle --list       # list your statuses
   luxafor-toggle --current    # print the current status
@@ -140,13 +146,39 @@ you edited the file while the tray icon wasn't running).
 
 Your configuration is kept when you re-run `./install.sh`.
 
+### Settings
+
+The same file holds two settings, as `key = value` lines:
+
+```ini
+# Status to go back to when a timer ends (default: available, or your first status)
+default-status = available
+
+# Status used automatically while you are in a call (default: call)
+call-status = call
+```
+
+`luxafor-toggle --settings` shows the values in use.
+
+### Timers
+
+`luxafor-toggle busy --for 30` (or **Set for…** in the tray menu) sets a status
+for a while, then goes back to `default-status` with a notification.
+
+- Choosing another status by hand cancels the timer.
+- A call doesn't: when the call ends, the light goes back to the timed status
+  if the timer is still running, or to `default-status` if it ended during the call.
+- Timers survive suspending the laptop. If you log out before a timer ends, it
+  resumes at your next login (or ends right away if it's already over).
+
 ## Automatic call status
 
 `luxafor-callwatch` starts at login and watches which applications use your
 microphone. When your web browser starts recording — which is what happens when
 you join a call in Teams, Odoo, Google Meet, Jitsi or any other web app — the
-light switches to **On a call**. When the call ends, it goes back to the status
-you had before (unless you changed it yourself during the call).
+light switches to your `call-status` (**On a call** by default — see
+[Settings](#settings)). When the call ends, it goes back to the status you had
+before (unless you changed it yourself during the call).
 
 It works with PipeWire and PulseAudio, needs no browser extension, and keeps
 working when you mute yourself during the call.
@@ -157,12 +189,11 @@ To check what it sees, run this **during a call**:
 luxafor-callwatch --check
 ```
 
-To change its behavior, create `~/.config/luxafor-status/callwatch.conf`:
+To choose the status used during calls, set `call-status` in your
+statuses (`luxafor-toggle --edit`). Other options go in
+`~/.config/luxafor-status/callwatch.conf`:
 
 ```ini
-# Status used during calls — any id from: luxafor-toggle --list
-status = busy
-
 # Apps that count as "in a call" when they use the microphone
 # (matched against the app name; default: common web browsers)
 apps = firefox chrome chromium brave msedge vivaldi opera
@@ -171,7 +202,13 @@ apps = firefox chrome chromium brave msedge vivaldi opera
 enabled = yes
 ```
 
-Then log out and back in (or restart it: `pkill -f luxafor-callwatch; luxafor-callwatch &`).
+Changes to `call-status` apply from the next call. After editing
+`callwatch.conf`, log out and back in (or restart it:
+`pkill -f luxafor-callwatch; luxafor-callwatch &`).
+
+> [!TIP]
+> Versions up to 0.2 read the call status from `status = …` in `callwatch.conf`.
+> That still works, but `call-status` in `statuses.conf` takes precedence.
 
 > [!NOTE]
 > Any recording by a watched app counts as a call — for example a voice message

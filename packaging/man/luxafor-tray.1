@@ -6,7 +6,11 @@ luxafor-tray \- system tray icon showing the Luxafor status
 .SH DESCRIPTION
 .B luxafor-tray
 shows a dot in the system tray with the color of the current status.
-Its menu sets a status, opens the status configuration, or quits the icon.
+Its menu sets a status, sets one for a while
+.RB ( "Set for..." ),
+opens the status configuration, or quits the icon. While a timer runs, the
+time left is shown next to the dot and at the top of the menu, with an entry
+to cancel it.
 .PP
 It follows changes made by
 .BR luxafor-toggle (1)
