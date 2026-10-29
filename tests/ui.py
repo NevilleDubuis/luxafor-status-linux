@@ -192,6 +192,30 @@ with open(f"{TMP}/config/luxafor-status/statuses.conf", "a") as f:
     f.write("theme = dark\n")
 eq("theme setting read from statuses.conf", panel_ns["apply_theme"](), "dark")
 
+print("starting the background parts from the panel")
+started = []
+os.makedirs(f"{TMP}/config/autostart", exist_ok=True)
+eq("nothing running → tray and call detection started",
+   panel_ns["start_background"](lambda path: started.append(os.path.basename(path))),
+   ["luxafor-tray", "luxafor-callwatch"])
+eq("…from the scripts next to the panel", started, ["luxafor-tray", "luxafor-callwatch"])
+owned = []
+Gio = panel_ns["Gio"]
+owner = Gio.bus_own_name(Gio.BusType.SESSION, panel_ns["TRAY_BUS_NAME"], 0,
+                         None, lambda *_a: owned.append(True), None)
+pump(1.0)
+eq("tray running (bus name owned) → only call detection started",
+   panel_ns["start_background"](lambda path: None), ["luxafor-callwatch"])
+Gio.bus_unown_name(owner)
+pump(0.5)
+with open(f"{TMP}/config/autostart/luxafor-tray.desktop", "w") as f:
+    f.write("[Desktop Entry]\nHidden=true\n")
+with open(f"{TMP}/config/autostart/luxafor-callwatch.desktop", "w") as f:
+    f.write("[Desktop Entry]\nX-GNOME-Autostart-enabled=false\n")
+eq("autostart turned off by the user → nothing started",
+   panel_ns["start_background"](lambda path: None), [])
+subprocess.run(["rm", "-rf", f"{TMP}/config/autostart"])
+
 print("luxafor-tray")
 try:
     tray_ns = load("luxafor-tray")

@@ -48,8 +48,9 @@ then:
 sudo apt install ./luxafor-status_*_all.deb
 ```
 
-`apt` installs the dependencies, the udev rule and the launcher, and starts the
-tray icon at your next login (or run `luxafor-tray &` right away). To remove it:
+`apt` installs the dependencies, the udev rule and the launchers. The tray icon
+and the call detection start at each login — to start them right away, open
+**Luxafor Panel** from the app menu once (or log out and back in). To remove it:
 `sudo apt remove luxafor-status`.
 
 ### From source

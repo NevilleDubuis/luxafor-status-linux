@@ -23,6 +23,7 @@ fake_hidraw hidraw1 0003:000004D8:0000F372 "Microchip Technology Inc. LUXAFOR OR
 fake_hidraw hidraw2 0003:000004D8:0000F372 "Microchip Technology Inc. LUXAFOR FLAG"
 
 export LUXAFOR_SYSFS="$TMP/sys" LUXAFOR_DEV="$TMP/dev"
+export XDG_RUNTIME_DIR="$TMP/run"
 export HOME="$TMP/home" XDG_DATA_HOME="$TMP/data" XDG_CONFIG_HOME="$TMP/config" \
        XDG_CACHE_HOME="$TMP/cache" XDG_DATA_DIRS="$TMP/share"
 mkdir -p "$HOME" "$TMP/share/luxafor-status"
@@ -170,6 +171,11 @@ exec 3<>"$TMP/events"
 "$WATCH" 2>/dev/null & WATCH_PID=$!
 trap 'stop_watch; rm -rf "$TMP"' EXIT
 sleep 0.5
+
+"$WATCH" 2>"$TMP/second.err"
+eq "a second watcher leaves at once" "$?" 0
+eq "…saying the first one is running" "$(grep -c 'already running' "$TMP/second.err")" 1
+eq "…and the first one keeps going" "$(kill -0 "$WATCH_PID" 2>/dev/null && echo yes || echo no)" yes
 
 stream 52 "Google Chrome" chrome > "$TMP/streams"; event new 52
 eq "call starts → configured status" "$("$TOGGLE" --current)" focus
