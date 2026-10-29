@@ -6,11 +6,11 @@ luxafor-tray \- system tray icon showing the Luxafor status
 .SH DESCRIPTION
 .B luxafor-tray
 shows a dot in the system tray with the color of the current status.
-Its menu sets a status, sets one for a while
-.RB ( "Set for..." ),
-opens the status configuration, or quits the icon. While a timer runs, the
-time left is shown next to the dot and at the top of the menu, with an entry
-to cancel it.
+Its menu sets a status, opens
+.BR luxafor-panel (1)
+(also with a middle-click on the icon) to set one for a while, opens the
+status configuration, or quits the icon. While a timer runs, the time left is
+shown next to the dot and at the top of the menu, with an entry to cancel it.
 .PP
 It follows changes made by
 .BR luxafor-toggle (1)
@@ -20,5 +20,6 @@ configuration when the file is saved.
 It is started at login through
 .IR /etc/xdg/autostart/luxafor-tray.desktop .
 .SH SEE ALSO
+.BR luxafor-panel (1),
 .BR luxafor-light (1),
 .BR luxafor-toggle (1)

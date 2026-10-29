@@ -44,13 +44,16 @@ install -d "$STAGE/DEBIAN" "$STAGE/usr/bin" "$DOC" \
     "$STAGE/usr/share/man/man1" "$STAGE/usr/share/metainfo"
 
 install -m 0755 "$ROOT/bin/luxafor-light" "$ROOT/bin/luxafor-toggle" \
-    "$ROOT/bin/luxafor-tray" "$ROOT/bin/luxafor-callwatch" "$STAGE/usr/bin/"
+    "$ROOT/bin/luxafor-tray" "$ROOT/bin/luxafor-callwatch" "$ROOT/bin/luxafor-panel" \
+    "$STAGE/usr/bin/"
 install -m 0644 "$ROOT/share/statuses.conf" "$STAGE/usr/share/$PKG/statuses.conf"
 install -m 0644 "$ROOT/share/icons/luxafor-status.svg" \
     "$STAGE/usr/share/icons/hicolor/scalable/apps/luxafor-status.svg"
 install -m 0644 "$ROOT/udev/70-luxafor-status.rules" "$STAGE/usr/lib/udev/rules.d/"
 sed "s|@BINDIR@|/usr/bin|g" "$ROOT/share/applications/luxafor-tray.desktop.in" \
     > "$STAGE/etc/xdg/autostart/luxafor-tray.desktop"
+sed "s|@BINDIR@|/usr/bin|g" "$ROOT/share/applications/luxafor-panel.desktop.in" \
+    > "$STAGE/usr/share/applications/luxafor-panel.desktop"
 sed "s|@BINDIR@|/usr/bin|g" "$ROOT/share/applications/luxafor-callwatch.desktop.in" \
     > "$STAGE/etc/xdg/autostart/luxafor-callwatch.desktop"
 # AppStream metadata: declares the supported USB IDs (modalias), so software

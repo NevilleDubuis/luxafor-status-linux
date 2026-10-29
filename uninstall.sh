@@ -16,8 +16,9 @@ pkill -f "$BINDIR/luxafor-tray" >/dev/null 2>&1 || true
 pkill -f "$BINDIR/luxafor-callwatch" >/dev/null 2>&1 || true
 if [ -x "$BINDIR/luxafor-light" ]; then "$BINDIR/luxafor-light" off >/dev/null 2>&1 || true; fi
 
-rm -f  "$BINDIR/luxafor-light" "$BINDIR/luxafor-toggle" "$BINDIR/luxafor-tray" "$BINDIR/luxafor-callwatch"
-rm -f  "$DATA_HOME/applications/luxafor.desktop"
+rm -f  "$BINDIR/luxafor-light" "$BINDIR/luxafor-toggle" "$BINDIR/luxafor-tray" "$BINDIR/luxafor-callwatch" \
+       "$BINDIR/luxafor-panel"
+rm -f  "$DATA_HOME/applications/luxafor.desktop" "$DATA_HOME/applications/luxafor-panel.desktop"
 rm -f  "$DATA_HOME/icons/hicolor/scalable/apps/luxafor-status.svg"
 rm -f  "$DATA_HOME"/icons/lxftray-*.svg
 rm -rf "$DATA_HOME/luxafor-status"

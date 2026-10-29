@@ -67,6 +67,7 @@ install -m 0755 "$SRC/bin/luxafor-light"  "$BINDIR/luxafor-light"
 install -m 0755 "$SRC/bin/luxafor-toggle" "$BINDIR/luxafor-toggle"
 install -m 0755 "$SRC/bin/luxafor-tray"   "$BINDIR/luxafor-tray"
 install -m 0755 "$SRC/bin/luxafor-callwatch" "$BINDIR/luxafor-callwatch"
+install -m 0755 "$SRC/bin/luxafor-panel" "$BINDIR/luxafor-panel"
 install -m 0644 "$SRC/share/icons/luxafor-status.svg" "$APPICONDIR/luxafor-status.svg"
 # Clean up icons from previous versions. An app icon named "luxafor" made
 # Budgie's tray show it instead of the status color (see bin/luxafor-tray).
@@ -84,6 +85,9 @@ else
 fi
 
 "$BINDIR/luxafor-toggle" --reload >/dev/null
+mkdir -p "$DATA_HOME/applications"
+sed "s|@BINDIR@|$BINDIR|g" "$SRC/share/applications/luxafor-panel.desktop.in" \
+    > "$DATA_HOME/applications/luxafor-panel.desktop"
 ok "\"Luxafor\" launcher added to the app menu"
 
 if [ "$DO_AUTOSTART" -eq 1 ]; then
@@ -124,7 +128,8 @@ cat <<EOF
 
 Done ✔
 
-  • App menu → "Luxafor": drag it to your dock (click = next status)
+  • App menu → "Luxafor Panel": pick a status, optionally for a while
+  • App menu → "Luxafor": one click = next status (drag either to your dock)
   • System tray: the dot shows the current color (click = menu)
   • Terminal: luxafor-toggle --list
   • Customize statuses and settings: luxafor-toggle --edit

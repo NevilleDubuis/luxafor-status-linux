@@ -1,0 +1,352 @@
+#!/usr/bin/python3
+"""luxafor-panel — a small window to pick a status, optionally for a while.
+
+Choose a duration (∞ = no timer), then click a status: it is applied and the
+panel closes. Keyboard: 1–9 pick a status, Esc closes.
+
+Everything goes through luxafor-toggle, so the panel never disagrees with
+the tray icon, the launcher or the command line.
+"""
+import os
+import shutil
+import subprocess
+import sys
+import time
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
+
+HOME = os.path.expanduser("~")
+CACHE_HOME = os.environ.get("XDG_CACHE_HOME", f"{HOME}/.cache")
+TIMER = f"{CACHE_HOME}/luxafor-timer"
+_HERE = os.path.dirname(os.path.realpath(__file__))
+TOGGLE = (
+    f"{_HERE}/luxafor-toggle"
+    if os.path.isfile(f"{_HERE}/luxafor-toggle")
+    else shutil.which("luxafor-toggle") or f"{HOME}/.local/bin/luxafor-toggle"
+)
+
+APP_ID = "io.github.nevilledubuis.luxafor_status.panel"
+OFF_COLOR = "#9e9e9e"
+# (minutes, label); None = no timer
+DURATIONS = [(None, "∞"), (15, "15 min"), (30, "30 min"), (60, "1 h"), (120, "2 h")]
+CUSTOM_DEFAULT = 45
+
+CSS = b"""
+.lx-panel { padding: 14px; }
+.lx-heading { font-size: smaller; font-weight: bold; opacity: 0.6; margin-top: 4px; }
+.lx-current-name { font-size: larger; font-weight: bold; }
+.lx-timer { opacity: 0.75; }
+.lx-status { padding: 6px 10px; }
+.lx-status.lx-current { box-shadow: inset 0 0 0 2px @theme_selected_bg_color; font-weight: bold; }
+.lx-hint { font-size: smaller; opacity: 0.55; }
+"""
+
+
+def toggle_output(*args):
+    try:
+        return subprocess.run(
+            [TOGGLE, *args], capture_output=True, text=True, check=False, timeout=5
+        ).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def load_statuses():
+    """[(id, color, label)] from `luxafor-toggle --list` (off included)."""
+    statuses = []
+    for line in toggle_output("--list").splitlines():
+        parts = line.split(None, 2)
+        if len(parts) < 2:
+            continue
+        sid, color = parts[0], parts[1]
+        label = parts[2].strip() if len(parts) > 2 else sid
+        statuses.append((sid, OFF_COLOR if sid == "off" else color, label))
+    return statuses or [("off", OFF_COLOR, "Off")]
+
+
+def read_timer():
+    try:
+        with open(TIMER) as f:
+            end, status = f.read().split()[:2]
+            return int(end), status
+    except (OSError, ValueError):
+        return None
+
+
+def human_minutes(minutes):
+    if minutes < 60:
+        return f"{minutes} min"
+    hours, rest = divmod(minutes, 60)
+    return f"{hours} h" if rest == 0 else f"{hours} h {rest:02d}"
+
+
+def system_prefers_dark():
+    """True if the desktop asks for dark apps (GNOME / Budgie "Style: Dark")."""
+    source = Gio.SettingsSchemaSource.get_default()
+    schema = source.lookup("org.gnome.desktop.interface", True) if source else None
+    if not schema or not schema.has_key("color-scheme"):
+        return False
+    return Gio.Settings.new("org.gnome.desktop.interface").get_string("color-scheme") == "prefer-dark"
+
+
+def apply_theme(mode=None):
+    """theme = auto | light | dark (statuses.conf).
+
+    auto keeps the desktop's GTK theme — dark themes stay dark — and also
+    follows the "prefer dark" desktop setting. light and dark use Adwaita,
+    which has both variants, so the choice always takes effect.
+    """
+    mode = mode or toggle_output("--setting", "theme").strip() or "auto"
+    settings = Gtk.Settings.get_default()
+    if mode in ("light", "dark"):
+        settings.set_property("gtk-theme-name", "Adwaita")
+        settings.set_property("gtk-application-prefer-dark-theme", mode == "dark")
+    elif system_prefers_dark():
+        settings.set_property("gtk-application-prefer-dark-theme", True)
+    return mode
+
+
+def dot(color, size="large"):
+    label = Gtk.Label()
+    label.set_markup(
+        f'<span foreground="{GLib.markup_escape_text(color)}" size="{size}">●</span>'
+    )
+    return label
+
+
+class Panel(Gtk.ApplicationWindow):
+    def __init__(self, app, run=None):
+        super().__init__(application=app, title="Luxafor")
+        # run(args): how commands are executed — replaced in tests.
+        self.run = run or (lambda args: subprocess.Popen([TOGGLE, *args]))
+        self.statuses = load_statuses()
+        self.current = (toggle_output("--current").strip() or "off")
+        self.minutes = None
+
+        self.set_resizable(False)
+        self.set_position(Gtk.WindowPosition.MOUSE)
+        self.set_keep_above(True)
+        self.set_skip_taskbar_hint(True)
+        self.set_type_hint(Gdk.WindowTypeHint.DIALOG)
+        self.set_icon_name("luxafor-status")
+        self.connect("key-press-event", self.on_key)
+        # Close when clicking elsewhere, like a popup — once it has had focus,
+        # so a window manager that doesn't focus new windows can't close it.
+        self.had_focus = False
+        self.connect("focus-in-event", self.on_focus_in)
+        self.connect("focus-out-event", self.on_focus_out)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.get_style_context().add_class("lx-panel")
+        self.add(box)
+
+        # Current status and timer
+        head = Gtk.Box(spacing=10)
+        self.head_dot = Gtk.Label()
+        head.pack_start(self.head_dot, False, False, 0)
+        text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.head_name = Gtk.Label(xalign=0)
+        self.head_name.get_style_context().add_class("lx-current-name")
+        self.head_timer = Gtk.Label(xalign=0)
+        self.head_timer.get_style_context().add_class("lx-timer")
+        text.pack_start(self.head_name, False, False, 0)
+        text.pack_start(self.head_timer, False, False, 0)
+        head.pack_start(text, True, True, 0)
+        self.cancel_button = Gtk.Button(label="Cancel timer")
+        self.cancel_button.set_valign(Gtk.Align.CENTER)
+        self.cancel_button.connect("clicked", self.on_cancel_timer)
+        head.pack_end(self.cancel_button, False, False, 0)
+        box.pack_start(head, False, False, 0)
+        box.pack_start(Gtk.Separator(), False, False, 4)
+
+        # Statuses
+        box.pack_start(self.heading("STATUS"), False, False, 0)
+        grid = Gtk.Grid(column_spacing=6, row_spacing=6, column_homogeneous=True)
+        self.status_buttons = {}
+        for n, (sid, color, label) in enumerate(self.statuses):
+            button = Gtk.Button()
+            content = Gtk.Box(spacing=8)
+            content.pack_start(dot(color), False, False, 0)
+            name = Gtk.Label(label=label, xalign=0)
+            name.set_ellipsize(Pango.EllipsizeMode.END)
+            content.pack_start(name, True, True, 0)
+            if n < 9:
+                key = Gtk.Label(label=str(n + 1))
+                key.get_style_context().add_class("lx-hint")
+                content.pack_end(key, False, False, 0)
+            button.add(content)
+            button.get_style_context().add_class("lx-status")
+            if sid == self.current:
+                button.get_style_context().add_class("lx-current")
+            button.set_tooltip_text(f"luxafor-toggle {sid}")
+            button.connect("clicked", self.on_status, sid)
+            grid.attach(button, n % 2, n // 2, 1, 1)
+            self.status_buttons[sid] = button
+        box.pack_start(grid, False, False, 0)
+
+        # Duration
+        box.pack_start(self.heading("FOR"), False, False, 0)
+        durations = Gtk.Box(spacing=0)
+        durations.get_style_context().add_class("linked")
+        self.duration_buttons = {}
+        group = None
+        for minutes, label in DURATIONS + [("custom", "")]:
+            if minutes == "custom":
+                button = Gtk.RadioButton.new_from_widget(group)
+                button.set_tooltip_text("Custom duration")
+                self.spin = Gtk.SpinButton.new_with_range(1, 1440, 5)
+                self.spin.set_value(CUSTOM_DEFAULT)
+                self.spin.set_width_chars(4)
+                self.spin.connect("value-changed", lambda _s: self.custom_button.set_active(True))
+                self.spin.connect("focus-in-event", lambda *_a: self.custom_button.set_active(True))
+                inner = Gtk.Box(spacing=4)
+                inner.pack_start(self.spin, False, False, 0)
+                inner.pack_start(Gtk.Label(label="min"), False, False, 0)
+                self.custom_button = button
+                button.add(inner)
+            else:
+                button = Gtk.RadioButton.new_with_label_from_widget(group, label)
+            button.set_mode(False)  # look like toggle buttons, not radio dots
+            button.connect("toggled", self.on_duration, minutes)
+            durations.pack_start(button, False, False, 0)
+            self.duration_buttons[minutes] = button
+            group = group or button
+        box.pack_start(durations, False, False, 0)
+
+        # Footer
+        footer = Gtk.Box(spacing=8)
+        hint = Gtk.Label(label="Pick a duration, then a status · Esc to close", xalign=0)
+        hint.get_style_context().add_class("lx-hint")
+        footer.pack_start(hint, True, True, 0)
+        edit = Gtk.LinkButton.new_with_label("", "Edit statuses…")
+        edit.connect("activate-link", self.on_edit)
+        footer.pack_end(edit, False, False, 0)
+        box.pack_start(footer, False, False, 4)
+
+        self.refresh_header()
+        GLib.timeout_add_seconds(15, self.refresh_header)
+
+    @staticmethod
+    def heading(text):
+        label = Gtk.Label(label=text, xalign=0)
+        label.get_style_context().add_class("lx-heading")
+        return label
+
+    def label_of(self, sid):
+        return next((l for s, _c, l in self.statuses if s == sid), sid)
+
+    def color_of(self, sid):
+        return next((c for s, c, _l in self.statuses if s == sid), OFF_COLOR)
+
+    def refresh_header(self):
+        self.head_dot.set_markup(
+            f'<span foreground="{GLib.markup_escape_text(self.color_of(self.current))}" '
+            f'size="xx-large">●</span>'
+        )
+        self.head_name.set_text(self.label_of(self.current))
+        timer = read_timer()
+        if timer:
+            end, status = timer
+            left = max(0, round((end - time.time()) / 60 + 0.49))
+            until = time.strftime("%H:%M", time.localtime(end))
+            who = "" if status == self.current else f"{self.label_of(status)} "
+            then = toggle_output("--setting", "default-status").strip()
+            self.head_timer.set_text(
+                f"{who}until {until} · {human_minutes(left)} left, then {self.label_of(then)}"
+            )
+            self.head_timer.show()
+            self.cancel_button.show()
+        else:
+            self.head_timer.set_text("No timer")
+            self.cancel_button.hide()
+        return True
+
+    # --- actions ---------------------------------------------------------------
+
+    def on_focus_in(self, *_args):
+        self.had_focus = True
+        return False
+
+    def on_focus_out(self, *_args):
+        if self.had_focus:
+            # Let a click on one of our own widgets finish first.
+            GLib.timeout_add(150, self.close_if_unfocused)
+        return False
+
+    def close_if_unfocused(self):
+        if not self.is_active():
+            self.close()
+        return False
+
+    def on_duration(self, button, minutes):
+        if button.get_active():
+            self.minutes = minutes
+
+    def chosen_minutes(self):
+        if self.minutes == "custom":
+            return int(self.spin.get_value())
+        return self.minutes
+
+    def on_status(self, _button, sid):
+        args = [sid]
+        minutes = self.chosen_minutes()
+        if minutes:
+            args += ["--for", str(minutes)]
+        self.run(args)
+        self.close()
+
+    def on_cancel_timer(self, _button):
+        self.run(["--cancel-timer"])
+        self.close()
+
+    def on_edit(self, _button):
+        self.run(["--edit"])
+        self.close()
+        return True  # handled: don't open a URI
+
+    def on_key(self, _widget, event):
+        if event.keyval == Gdk.KEY_Escape:
+            self.close()
+            return True
+        if self.spin.has_focus():
+            return False  # typing a custom duration
+        name = Gdk.keyval_name(event.keyval) or ""
+        if name.startswith("KP_"):
+            name = name[3:]
+        if len(name) == 1 and name in "123456789":
+            n = int(name) - 1
+            if n < len(self.statuses):
+                self.on_status(None, self.statuses[n][0])
+                return True
+        return False
+
+
+class App(Gtk.Application):
+    def __init__(self):
+        # A second launch brings the open panel to the front.
+        super().__init__(application_id=APP_ID)
+        self.window = None
+
+    def do_startup(self):
+        Gtk.Application.do_startup(self)
+        apply_theme()
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+
+    def do_activate(self):
+        if not self.window:
+            self.window = Panel(self)
+            self.window.show_all()
+            self.window.refresh_header()  # hides "Cancel timer" if there's no timer
+        self.window.present()
+
+
+if __name__ == "__main__":
+    sys.exit(App().run(sys.argv))

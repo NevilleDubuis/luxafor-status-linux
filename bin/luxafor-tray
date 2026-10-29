@@ -24,6 +24,7 @@ CACHE_HOME = os.environ.get("XDG_CACHE_HOME", f"{HOME}/.cache")
 
 # Prefer the luxafor-toggle installed next to this script (per-user or package).
 _HERE = os.path.dirname(os.path.realpath(__file__))
+PANEL = f"{_HERE}/luxafor-panel" if os.path.isfile(f"{_HERE}/luxafor-panel") else "luxafor-panel"
 TOGGLE = (
     f"{_HERE}/luxafor-toggle"
     if os.path.isfile(f"{_HERE}/luxafor-toggle")
@@ -45,8 +46,6 @@ DEFAULT_CONF = next(
 STATE = f"{CACHE_HOME}/luxafor-state"
 TIMER = f"{CACHE_HOME}/luxafor-timer"
 
-# Durations offered in the "Set for…" menu, in minutes.
-DURATIONS = [15, 30, 45, 60, 90, 120]
 
 # Tray icons go straight into ~/.local/share/icons: every icon lookup
 # (GTK and system tray hosts such as Budgie's) searches that folder.
@@ -206,33 +205,17 @@ class Tray:
             menu.append(cancel)
             menu.append(Gtk.SeparatorMenuItem())
 
+        # The panel has everything (durations, custom timer…); the menu keeps
+        # one-click statuses. Middle-click on the icon also opens the panel.
+        panel = Gtk.MenuItem(label="Open panel…")
+        panel.connect("activate", lambda _w: subprocess.Popen([PANEL]))
+        menu.append(panel)
+        menu.append(Gtk.SeparatorMenuItem())
+
         for sid, _color, label in self.statuses + [("off", OFF_COLOR, "Off")]:
             item = Gtk.MenuItem(label=label)
             item.connect("activate", lambda _w, s=sid: subprocess.Popen([TOGGLE, s]))
             menu.append(item)
-
-        # "Set for…" → status → duration
-        timed = Gtk.MenuItem(label="Set for…")
-        timed_menu = Gtk.Menu()
-        default = subprocess.run(
-            [TOGGLE, "--setting", "default-status"], capture_output=True, text=True, check=False
-        ).stdout.strip()
-        for sid, _color, label in self.statuses:
-            if sid == default:
-                continue  # a timer goes back to the default status anyway
-            status_item = Gtk.MenuItem(label=label)
-            durations = Gtk.Menu()
-            for minutes in DURATIONS:
-                d = Gtk.MenuItem(label=human_minutes(minutes))
-                d.connect(
-                    "activate",
-                    lambda _w, s=sid, m=minutes: subprocess.Popen([TOGGLE, s, "--for", str(m)]),
-                )
-                durations.append(d)
-            status_item.set_submenu(durations)
-            timed_menu.append(status_item)
-        timed.set_submenu(timed_menu)
-        menu.append(timed)
 
         menu.append(Gtk.SeparatorMenuItem())
         edit = Gtk.MenuItem(label="Edit statuses…")
@@ -243,6 +226,8 @@ class Tray:
         menu.append(quit_item)
         menu.show_all()
         self.ind.set_menu(menu)
+        # After set_menu: the target must belong to the menu in use.
+        self.ind.set_secondary_activate_target(panel)
 
     def tick(self):
         mtime = config_mtime()

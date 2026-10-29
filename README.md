@@ -6,6 +6,7 @@
 Control a **Luxafor** status light from Ubuntu, with:
 
 - 🖱️ **a dock button** — click to cycle through statuses, right-click to pick one;
+- 🪟 **a quick panel** — big status buttons and one-click durations;
 - 🟢 **a system tray icon** that shows the current color;
 - ⌨️ **a command** — `luxafor-toggle` — for scripts and keyboard shortcuts;
 - 🎨 **your own statuses** — as many as you want, with any name and color;
@@ -85,9 +86,15 @@ Options:
 ## Usage
 
 - **Dock**: open the app menu, search for "Luxafor" and drag it to your dock or panel.
-- **System tray**: click the dot to pick a status, or **Set for…** to set one
-  for a while (15 min to 2 h). While a timer runs, the time left shows next to
-  the dot and at the top of the menu, with **Cancel timer**.
+- **Panel**: "Luxafor Panel" in the app menu (pin it to your dock), or **Open
+  panel…** in the tray menu, or a middle-click on the tray dot. Pick a duration
+  (∞ = no timer), then click a status. Keys `1`–`9` pick a status, `Esc` closes.
+
+  <img src="docs/panel.png" alt="The Luxafor panel, light: current status and timer, one button per status, durations" width="400"> <img src="docs/panel-dark.png" alt="The same panel in dark mode" width="400">
+
+- **System tray**: the dot shows the current color. Its menu sets a status in
+  one click and opens the panel. While a timer runs, the time left shows next
+  to the dot and at the top of the menu, with **Cancel timer**.
 - **Terminal**:
 
   ```bash
@@ -156,13 +163,20 @@ default-status = available
 
 # Status used automatically while you are in a call (default: call)
 call-status = call
+
+# Look of the panel: auto (default), light or dark
+theme = auto
 ```
+
+With `theme = auto`, the panel follows your desktop: a dark GTK theme, or the
+"prefer dark" style setting of GNOME / Budgie, gives a dark panel. `light` and
+`dark` force it (with the standard Adwaita look).
 
 `luxafor-toggle --settings` shows the values in use.
 
 ### Timers
 
-`luxafor-toggle busy --for 30` (or **Set for…** in the tray menu) sets a status
+`luxafor-toggle busy --for 30` (or a duration in the panel) sets a status
 for a while, then goes back to `default-status` with a notification.
 
 - Choosing another status by hand cancels the timer.

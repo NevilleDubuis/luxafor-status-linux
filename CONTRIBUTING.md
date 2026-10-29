@@ -26,9 +26,10 @@ Running `luxafor-toggle` from a terminal usually prints a useful error message.
 
    ```bash
    tests/run.sh                 # driver and statuses, no light needed
+   xvfb-run -a dbus-run-session -- tests/ui.py   # panel and tray
    shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle \
               bin/luxafor-callwatch packaging/build-deb.sh tests/run.sh
-   python3 -m py_compile bin/luxafor-tray
+   python3 -m py_compile bin/luxafor-tray bin/luxafor-panel
    ```
 
 4. Test `./install.sh` and `./uninstall.sh` on your machine if you touched them.
@@ -68,6 +69,7 @@ bin/luxafor-toggle     sets or cycles the status (calls luxafor-light), and gene
                        the status icons and the dock launcher (--reload)
 bin/luxafor-tray       tray icon showing the current status (Python + AppIndicator)
 bin/luxafor-callwatch  call detection: watches microphone streams with `pactl`
+bin/luxafor-panel      quick panel (Python + GTK 3); runs luxafor-toggle for every action
 share/statuses.conf    default status configuration
 share/icons/           application icon (luxafor-status)
 share/applications/    autostart templates (@BINDIR@ is replaced at install time)
@@ -76,6 +78,8 @@ install.sh             per-user installer (from source)
 uninstall.sh           uninstaller for the per-user install
 packaging/             .deb build script, man pages, AppStream metadata
 tests/run.sh           tests with a fake light
+tests/ui.py            panel and tray tests, under a virtual display
+docs/                  README images
 .github/workflows/     CI (checks + package build) and releases
 ```
 

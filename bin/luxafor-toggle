@@ -54,7 +54,7 @@ die() { echo "luxafor-toggle: $1" >&2; notify "$1"; exit "${2:-1}"; }
 # Loads statuses into IDS / COLORS / LABELS (parallel arrays), and the
 # settings ("key = value" lines) into SET_DEFAULT / SET_CALL.
 load_statuses() {
-    IDS=(); COLORS=(); LABELS=(); SET_DEFAULT=""; SET_CALL=""
+    IDS=(); COLORS=(); LABELS=(); SET_DEFAULT=""; SET_CALL=""; SET_THEME=""
     local file="$CONF" line id color label key value n=0
     [ -f "$file" ] || file="$DEFAULT_CONF"
     if [ ! -f "$file" ]; then
@@ -71,6 +71,7 @@ load_statuses() {
             case "$key" in
                 default-status) SET_DEFAULT="$value" ;;
                 call-status)    SET_CALL="$value" ;;
+                theme)          SET_THEME="$value" ;;
                 *) [ "$VERBOSE" -eq 1 ] && echo "luxafor-toggle: unknown setting '$key' on line $n in $file" >&2 ;;
             esac
             continue
@@ -98,6 +99,11 @@ resolve_settings() {
         fi
         if index_of available >/dev/null; then DEFAULT_STATUS=available; else DEFAULT_STATUS="${IDS[0]}"; fi
     fi
+    case "${SET_THEME:-auto}" in
+        auto|light|dark) THEME="${SET_THEME:-auto}" ;;
+        *) THEME=auto
+           [ "$VERBOSE" -eq 1 ] && echo "luxafor-toggle: theme '$SET_THEME' should be auto, light or dark" >&2 ;;
+    esac
     if [ -n "$SET_CALL" ] && ! index_of "$SET_CALL" >/dev/null && [ "$VERBOSE" -eq 1 ]; then
         echo "luxafor-toggle: call-status '$SET_CALL' is not one of your statuses" >&2
     fi
@@ -145,7 +151,8 @@ reload() {
         echo "Terminal=false"
         echo "Categories=Utility;"
         echo "Keywords=luxafor;busylight;status;"
-        echo "Actions=${actions}off;"
+        echo "Actions=panel;${actions}off;"
+        printf '\n[Desktop Action panel]\nName=Open panel…\nExec=%s/luxafor-panel\n' "$BINDIR"
         for i in "${!IDS[@]}"; do
             id="${IDS[$i]}"
             printf '\n[Desktop Action %s]\nName=%s\nExec=%s/luxafor-toggle %s\n' \
@@ -293,11 +300,13 @@ while [ $# -gt 0 ]; do
         --settings)
             echo "default-status = $DEFAULT_STATUS"
             echo "call-status    = ${SET_CALL:-(not set — see luxafor-callwatch)}"
+            echo "theme          = $THEME"
             exit 0 ;;
         --setting)
             case "${2:-}" in
                 default-status) echo "$DEFAULT_STATUS" ;;
                 call-status) [ -n "$SET_CALL" ] && echo "$SET_CALL" ;;
+                theme) echo "$THEME" ;;
                 *) echo "Unknown setting '${2:-}'" >&2; exit 2 ;;
             esac
             exit 0 ;;

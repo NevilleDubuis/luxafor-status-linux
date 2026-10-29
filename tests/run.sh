@@ -71,7 +71,7 @@ echo "legacy-green" > "$XDG_CACHE_HOME/luxafor-state"
 
 "$TOGGLE" --reload >/dev/null 2>&1
 DESKTOP="$XDG_DATA_HOME/applications/luxafor.desktop"
-eq "launcher has one action per status" "$(sed -n 's/^Actions=//p' "$DESKTOP")" "dispo;focus;pipe;off;"
+eq "launcher: open panel, then one action per status" "$(sed -n 's/^Actions=//p' "$DESKTOP")" "panel;dispo;focus;pipe;off;"
 eq "one icon per status, plus off" "$(find "$XDG_DATA_HOME/luxafor-status/icons" -name "*.svg" | wc -l | tr -d ' ')" 4
 if command -v desktop-file-validate >/dev/null 2>&1; then
     if desktop-file-validate "$DESKTOP"; then ok "launcher passes desktop-file-validate"

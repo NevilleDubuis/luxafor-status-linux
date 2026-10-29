@@ -1,0 +1,45 @@
+.TH LUXAFOR-PANEL 1 "" "luxafor-status" "User Commands"
+.SH NAME
+luxafor-panel \- pick the Luxafor light status, optionally for a while
+.SH SYNOPSIS
+.B luxafor-panel
+.SH DESCRIPTION
+.B luxafor-panel
+opens a small window showing the current status and the running timer,
+with one button per status and a choice of durations.
+.PP
+Pick a duration first \(em
+.B \(if
+(no timer, the default), 15 or 30 minutes, 1 or 2 hours, or a custom
+number of minutes \(em then click a status: it is applied and the window
+closes. With a duration, the light goes back to the default status at the
+end (see
+.BR luxafor-toggle (1)).
+.PP
+The window also cancels a running timer, and opens the status
+configuration. It closes when it loses focus. Launching it again while it is
+open brings it to the front.
+.PP
+It is in the application menu as
+.BR "Luxafor Panel" ,
+in the tray icon's menu (middle-click on the icon also opens it), and in the
+right-click menu of the
+.B Luxafor
+launcher.
+.PP
+It follows the desktop's light or dark style, unless the
+.B theme
+setting (see
+.BR luxafor-toggle (1))
+forces
+.BR light " or " dark .
+.SH KEYS
+.TP
+.BR 1 \(en 9
+Pick the first to ninth status.
+.TP
+.B Esc
+Close the window.
+.SH SEE ALSO
+.BR luxafor-toggle (1),
+.BR luxafor-tray (1)

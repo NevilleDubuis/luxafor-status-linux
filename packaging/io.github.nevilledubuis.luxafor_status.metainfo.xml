@@ -13,7 +13,8 @@
     </p>
     <p>
       Statuses are configurable: as many as you like, with your own names
-      and colors.
+      and colors. A small panel sets one for a while — busy for 30 minutes,
+      then back to available.
     </p>
     <p>
       During calls in your web browser (Teams, Odoo, Meet…), the light can
@@ -32,6 +33,7 @@
     <binary>luxafor-toggle</binary>
     <binary>luxafor-tray</binary>
     <binary>luxafor-callwatch</binary>
+    <binary>luxafor-panel</binary>
   </provides>
   <categories>
     <category>Utility</category>
