@@ -8,7 +8,9 @@ Control a **Luxafor** status light from Ubuntu, with:
 - 🖱️ **a dock button** — click to cycle through statuses, right-click to pick one;
 - 🟢 **a system tray icon** that shows the current color;
 - ⌨️ **a command** — `luxafor-toggle` — for scripts and keyboard shortcuts;
-- 🎨 **your own statuses** — as many as you want, with any name and color.
+- 🎨 **your own statuses** — as many as you want, with any name and color;
+- 📞 **automatic call status** — the light switches to a status of your choice
+  while you're in a call in your browser (Teams, Odoo, Google Meet, Jitsi…).
 
 Default statuses:
 
@@ -138,6 +140,44 @@ you edited the file while the tray icon wasn't running).
 
 Your configuration is kept when you re-run `./install.sh`.
 
+## Automatic call status
+
+`luxafor-callwatch` starts at login and watches which applications use your
+microphone. When your web browser starts recording — which is what happens when
+you join a call in Teams, Odoo, Google Meet, Jitsi or any other web app — the
+light switches to **On a call**. When the call ends, it goes back to the status
+you had before (unless you changed it yourself during the call).
+
+It works with PipeWire and PulseAudio, needs no browser extension, and keeps
+working when you mute yourself during the call.
+
+To check what it sees, run this **during a call**:
+
+```bash
+luxafor-callwatch --check
+```
+
+To change its behavior, create `~/.config/luxafor-status/callwatch.conf`:
+
+```ini
+# Status used during calls — any id from: luxafor-toggle --list
+status = busy
+
+# Apps that count as "in a call" when they use the microphone
+# (matched against the app name; default: common web browsers)
+apps = firefox chrome chromium brave msedge vivaldi opera
+
+# Set to "no" to turn call detection off
+enabled = yes
+```
+
+Then log out and back in (or restart it: `pkill -f luxafor-callwatch; luxafor-callwatch &`).
+
+> [!NOTE]
+> Any recording by a watched app counts as a call — for example a voice message
+> recorded in a browser tab, or the microphone test screen before joining a
+> Teams meeting.
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -148,6 +188,7 @@ Your configuration is kept when you re-run `./install.sh`.
 | A status is missing from the menu | Run `luxafor-toggle --list`: invalid lines in `statuses.conf` are reported there. |
 | `luxafor-light list` shows nothing | Run `lsusb \| grep -i 04d8`. If your light shows a different ID than `04d8:f372`, please open an issue — it's probably a model that isn't supported yet. |
 | No tray icon | Make sure the "System Tray" applet is on your panel. On GNOME, install the *AppIndicator Support* extension. |
+| Call status doesn't switch | Run `luxafor-callwatch --check` during the call: is your browser listed? If it has an unusual name, add it to `apps`. If the call detection reports that `pactl` is missing: `sudo apt install pulseaudio-utils`. |
 | `luxafor-toggle: command not found` | Log out and back in so `~/.local/bin` is on your `PATH`. |
 
 ## Upgrading from an earlier version

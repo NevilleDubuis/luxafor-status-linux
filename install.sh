@@ -37,7 +37,7 @@ fi
 # 1. System dependencies ------------------------------------------------------
 if [ "$DO_DEPS" -eq 1 ]; then
     step "System dependencies"
-    PKGS=(python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 libnotify-bin)
+    PKGS=(python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 libnotify-bin pulseaudio-utils)
     MISSING=()
     for p in "${PKGS[@]}"; do
         dpkg -s "$p" >/dev/null 2>&1 || MISSING+=("$p")
@@ -66,6 +66,7 @@ mkdir -p "$BINDIR" "$SHAREDIR" "$APPICONDIR"
 install -m 0755 "$SRC/bin/luxafor-light"  "$BINDIR/luxafor-light"
 install -m 0755 "$SRC/bin/luxafor-toggle" "$BINDIR/luxafor-toggle"
 install -m 0755 "$SRC/bin/luxafor-tray"   "$BINDIR/luxafor-tray"
+install -m 0755 "$SRC/bin/luxafor-callwatch" "$BINDIR/luxafor-callwatch"
 install -m 0644 "$SRC/share/icons/luxafor-status.svg" "$APPICONDIR/luxafor-status.svg"
 # Clean up icons from previous versions. An app icon named "luxafor" made
 # Budgie's tray show it instead of the status color (see bin/luxafor-tray).
@@ -89,16 +90,24 @@ if [ "$DO_AUTOSTART" -eq 1 ]; then
     mkdir -p "$AUTOSTART"
     sed "s|@BINDIR@|$BINDIR|g" "$SRC/share/applications/luxafor-tray.desktop.in" \
         > "$AUTOSTART/luxafor-tray.desktop"
-    ok "tray icon starts at login"
+    sed "s|@BINDIR@|$BINDIR|g" "$SRC/share/applications/luxafor-callwatch.desktop.in" \
+        > "$AUTOSTART/luxafor-callwatch.desktop"
+    ok "tray icon and call detection start at login"
 fi
 
-# 4. Start the tray icon now --------------------------------------------------
-step "Starting the tray icon"
+# 4. Start the tray icon and call detection now -------------------------------
+step "Starting the tray icon and call detection"
 pkill -f "$BINDIR/luxafor-tray" >/dev/null 2>&1 || true
+pkill -f "$BINDIR/luxafor-callwatch" >/dev/null 2>&1 || true
 if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
     nohup "$BINDIR/luxafor-tray" >/dev/null 2>&1 &
     disown || true
     ok "tray icon started"
+    if [ "$DO_AUTOSTART" -eq 1 ]; then
+        nohup "$BINDIR/luxafor-callwatch" >/dev/null 2>&1 &
+        disown || true
+        ok "call detection started"
+    fi
 else
     warn "no graphical session detected: the tray icon will start at next login"
 fi
@@ -119,6 +128,7 @@ Done ✔
   • System tray: the dot shows the current color (click = menu)
   • Terminal: luxafor-toggle --list
   • Customize statuses: luxafor-toggle --edit
+  • Call detection: luxafor-callwatch --check (during a call)
 
 Uninstall: ./uninstall.sh
 EOF

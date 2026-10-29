@@ -1,0 +1,48 @@
+.TH LUXAFOR-CALLWATCH 1 "" "luxafor-status" "User Commands"
+.SH NAME
+luxafor-callwatch \- switch the Luxafor light to a status during calls
+.SH SYNOPSIS
+.B luxafor-callwatch
+.RB [ \-\-check ]
+.SH DESCRIPTION
+.B luxafor-callwatch
+watches which applications record from the microphone, through
+.BR pactl (1)
+(PipeWire or PulseAudio). When a watched application \(em a web browser by
+default, which covers Teams, Odoo, Google Meet, Jitsi and other calls in a
+browser tab \(em starts recording, the light switches to the call status.
+When the call ends, the previous status comes back, unless the status was
+changed by hand during the call.
+.PP
+It is started at login through
+.IR /etc/xdg/autostart/luxafor-callwatch.desktop .
+.SH OPTIONS
+.TP
+.B \-\-check
+Show the applications using the microphone right now, and whether that
+counts as a call. Run it during a call to check the detection.
+.SH CONFIGURATION
+.I ~/.config/luxafor-status/callwatch.conf
+(optional), one
+.IR key " = " value
+per line:
+.TP
+.B status
+Status id used during calls (default:
+.BR call ).
+Any id listed by
+.BR "luxafor-toggle \-\-list" .
+.TP
+.B apps
+Space-separated names matched against the application name and binary
+(default: common web browsers).
+.TP
+.B enabled
+.B no
+turns call detection off.
+.PP
+Restart the watcher (or log out and back in) after changing the file.
+.SH SEE ALSO
+.BR luxafor-toggle (1),
+.BR luxafor-tray (1),
+.BR pactl (1)

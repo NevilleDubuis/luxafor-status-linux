@@ -21,7 +21,7 @@ jobs:
             python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1
 
       - name: ShellCheck
-        run: shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle packaging/build-deb.sh tests/run.sh
+        run: shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle bin/luxafor-callwatch packaging/build-deb.sh tests/run.sh
 
       - name: Python
         run: |

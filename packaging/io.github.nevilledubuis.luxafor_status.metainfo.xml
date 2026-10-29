@@ -15,6 +15,10 @@
       Statuses are configurable: as many as you like, with your own names
       and colors.
     </p>
+    <p>
+      During calls in your web browser (Teams, Odoo, Meet…), the light can
+      switch to a status of your choice automatically.
+    </p>
   </description>
   <launchable type="desktop-id">luxafor.desktop</launchable>
   <url type="homepage">https://github.com/NevilleDubuis/luxafor-status-linux</url>
@@ -27,6 +31,7 @@
     <binary>luxafor-light</binary>
     <binary>luxafor-toggle</binary>
     <binary>luxafor-tray</binary>
+    <binary>luxafor-callwatch</binary>
   </provides>
   <categories>
     <category>Utility</category>
