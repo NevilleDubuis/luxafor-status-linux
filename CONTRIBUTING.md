@@ -87,7 +87,7 @@ Runtime files:
 
 - `~/.config/luxafor-status/statuses.conf` — the user's statuses
   (`id | color | label`) and settings (`key = value`: `default-status`,
-  `call-status`). `luxafor-toggle` and `luxafor-tray` both parse the statuses
+  `call-status`, `theme`). `luxafor-toggle` and `luxafor-tray` both parse the statuses
   and must stay in sync if the format changes; other tools read settings with
   `luxafor-toggle --setting <key>`.
 - `~/.config/luxafor-status/callwatch.conf` — optional call detection
