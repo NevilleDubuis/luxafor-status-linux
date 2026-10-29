@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import time
 
 import gi
@@ -107,6 +108,40 @@ def load_statuses():
     return statuses or FALLBACK
 
 
+def load_shortcuts():
+    """[(status id, minutes)] for the tray menu — see timer-shortcuts."""
+    shortcuts = []
+    out = subprocess.run(
+        [TOGGLE, "--setting", "timer-shortcuts"], capture_output=True, text=True, check=False
+    ).stdout
+    for line in out.splitlines():
+        try:
+            sid, minutes = line.split()
+            shortcuts.append((sid, int(minutes)))
+        except ValueError:
+            pass
+    return shortcuts
+
+
+_children = []
+
+
+def spawn(*args):
+    """Starts a command without waiting for it; reap_children() collects it.
+
+    Without that, every closed panel or finished luxafor-toggle would stay
+    behind as a zombie process of the tray.
+    """
+    try:
+        _children.append(subprocess.Popen(list(args)))
+    except OSError as e:
+        print(f"luxafor-tray: cannot run {args[0]}: {e}", file=sys.stderr)
+
+
+def reap_children():
+    _children[:] = [p for p in _children if p.poll() is None]
+
+
 def read_state():
     try:
         with open(STATE) as f:
@@ -166,7 +201,7 @@ class Tray:
         self.timer_item = None   # menu line showing the time left
         self.timer_text = None
         # Restart a timer that was running before logout, or end it if expired.
-        subprocess.Popen([TOGGLE, "--resume-timer"])
+        spawn(TOGGLE, "--resume-timer")
         self.tick()
         GLib.timeout_add_seconds(1, self.tick)
 
@@ -179,6 +214,7 @@ class Tray:
             check=False,
         )
         self.statuses = load_statuses()
+        self.shortcuts = load_shortcuts()
         self.icons = write_tray_icons(self.statuses)
         self.build_menu()
         self.last_state = None  # force the icon to be set again
@@ -193,41 +229,53 @@ class Tray:
         return f"⏱ {self.label_of(status)} until {until} ({human_minutes(left)} left)", left
 
     def build_menu(self):
+        # Drop the middle-click target first: it belongs to the old menu,
+        # which is about to be destroyed.
+        self.ind.set_secondary_activate_target(None)
         menu = Gtk.Menu()
-        self.timer_item = None
-        if self.timer:
-            text, _left = self.timer_line()
-            self.timer_item = Gtk.MenuItem(label=text)
-            self.timer_item.set_sensitive(False)
-            menu.append(self.timer_item)
-            cancel = Gtk.MenuItem(label="Cancel timer")
-            cancel.connect("activate", lambda _w: subprocess.Popen([TOGGLE, "--cancel-timer"]))
-            menu.append(cancel)
+
+        def add(label, args=None, action=None, enabled=True):
+            item = Gtk.MenuItem(label=label)
+            item.set_sensitive(enabled)
+            if args:
+                item.connect("activate", lambda _w: spawn(TOGGLE, *args))
+            elif action:
+                item.connect("activate", lambda _w: action())
+            menu.append(item)
+            return item
+
+        def separator():
             menu.append(Gtk.SeparatorMenuItem())
 
-        # The panel has everything (durations, custom timer…); the menu keeps
-        # one-click statuses. Middle-click on the icon also opens the panel.
-        panel = Gtk.MenuItem(label="Open panel…")
-        panel.connect("activate", lambda _w: subprocess.Popen([PANEL]))
-        menu.append(panel)
-        menu.append(Gtk.SeparatorMenuItem())
+        # Running timer
+        self.timer_item = None
+        if self.timer:
+            self.timer_item = add(self.timer_line()[0], enabled=False)
+            add("Cancel timer", ["--cancel-timer"])
+            separator()
 
-        for sid, _color, label in self.statuses + [("off", OFF_COLOR, "Off")]:
-            item = Gtk.MenuItem(label=label)
-            item.connect("activate", lambda _w, s=sid: subprocess.Popen([TOGGLE, s]))
-            menu.append(item)
+        # Statuses, in one click
+        for sid, _color, label in self.statuses:
+            add(label, [sid])
+        separator()
 
-        menu.append(Gtk.SeparatorMenuItem())
-        edit = Gtk.MenuItem(label="Edit statuses…")
-        edit.connect("activate", lambda _w: subprocess.Popen([TOGGLE, "--edit"]))
-        menu.append(edit)
-        quit_item = Gtk.MenuItem(label="Quit tray icon")
-        quit_item.connect("activate", lambda _w: Gtk.main_quit())
-        menu.append(quit_item)
+        # Timers, in one click; anything else in the panel
+        for sid, minutes in self.shortcuts:
+            add(f"{self.label_of(sid)} for {human_minutes(minutes)}", [sid, "--for", str(minutes)])
+        other = add("Other duration…", action=lambda: spawn(PANEL))
+        separator()
+
+        # Off isn't a status: the light is just off
+        add("Off", ["off"])
+        separator()
+
+        add("Edit statuses…", ["--edit"])
+        add("Quit", action=Gtk.main_quit)
         menu.show_all()
         self.ind.set_menu(menu)
-        # After set_menu: the target must belong to the menu in use.
-        self.ind.set_secondary_activate_target(panel)
+        # Middle-click on the icon opens the panel. Set after set_menu: the
+        # target must belong to the menu in use.
+        self.ind.set_secondary_activate_target(other)
 
     def tick(self):
         mtime = config_mtime()
@@ -241,6 +289,7 @@ class Tray:
             self.ind.set_icon_full(self.icons[state], self.label_of(state))
             self.last_state = state
         self.update_timer()
+        reap_children()
         return True
 
     def update_timer(self):

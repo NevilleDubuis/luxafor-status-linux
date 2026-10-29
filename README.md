@@ -85,16 +85,23 @@ Options:
 
 ## Usage
 
-- **Dock**: open the app menu, search for "Luxafor" and drag it to your dock or panel.
-- **Panel**: "Luxafor Panel" in the app menu (pin it to your dock), or **Open
-  panel…** in the tray menu, or a middle-click on the tray dot. Pick a duration
-  (∞ = no timer), then click a status. Keys `1`–`9` pick a status, `Esc` closes.
+- **System tray**: the dot shows the current color. Right-click it:
+
+  <img src="docs/menu.png" alt="Tray menu: running timer and Cancel timer, then the statuses, the timer shortcuts, Other duration…, Off, Edit statuses…, Quit" width="256">
+
+  - a status in one click;
+  - a timer in one click (`timer-shortcuts`, see [Settings](#settings));
+  - **Other duration…** opens the panel (a middle-click on the dot too);
+  - while a timer runs, the time left shows next to the dot and at the top of
+    the menu, with **Cancel timer**.
+- **Panel**, for any duration: "Luxafor Panel" in the app menu, or **Other
+  duration…** in the tray menu. Pick a duration (∞ = no timer), then click a
+  status. Keys `1`–`9` pick a status, `Esc` closes.
 
   <img src="docs/panel.png" alt="The Luxafor panel, light: current status and timer, one button per status, durations" width="400"> <img src="docs/panel-dark.png" alt="The same panel in dark mode" width="400">
 
-- **System tray**: the dot shows the current color. Its menu sets a status in
-  one click and opens the panel. While a timer runs, the time left shows next
-  to the dot and at the top of the menu, with **Cancel timer**.
+- **Dock**: "Luxafor" in the app menu — one click goes to the next status.
+  Drag it (or "Luxafor Panel") to your dock.
 - **Terminal**:
 
   ```bash
@@ -163,6 +170,10 @@ default-status = available
 
 # Status used automatically while you are in a call (default: call)
 call-status = call
+
+# Timers offered in one click in the tray menu: "<status> <duration>",
+# separated by commas (default: your first non-default status, 30 min and 1 h)
+timer-shortcuts = busy 30, busy 1h, focus 1h30
 
 # Look of the panel: auto (default), light or dark
 theme = auto

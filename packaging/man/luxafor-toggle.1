@@ -95,6 +95,14 @@ Status used during calls by
 (default:
 .BR call ).
 .TP
+.B timer-shortcuts
+Timers offered in one click in the tray menu, as comma-separated
+.I "status duration"
+pairs, e.g.
+.BR "busy 30, busy 1h, focus 1h30" .
+Default: the first status that isn't the default one, for 30 minutes and
+1 hour. Empty: none.
+.TP
 .B theme
 Look of
 .BR luxafor-panel (1):

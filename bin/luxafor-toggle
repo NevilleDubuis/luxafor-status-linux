@@ -54,7 +54,7 @@ die() { echo "luxafor-toggle: $1" >&2; notify "$1"; exit "${2:-1}"; }
 # Loads statuses into IDS / COLORS / LABELS (parallel arrays), and the
 # settings ("key = value" lines) into SET_DEFAULT / SET_CALL.
 load_statuses() {
-    IDS=(); COLORS=(); LABELS=(); SET_DEFAULT=""; SET_CALL=""; SET_THEME=""
+    IDS=(); COLORS=(); LABELS=(); SET_DEFAULT=""; SET_CALL=""; SET_THEME=""; SET_SHORTCUTS="-"
     local file="$CONF" line id color label key value n=0
     [ -f "$file" ] || file="$DEFAULT_CONF"
     if [ ! -f "$file" ]; then
@@ -72,6 +72,7 @@ load_statuses() {
                 default-status) SET_DEFAULT="$value" ;;
                 call-status)    SET_CALL="$value" ;;
                 theme)          SET_THEME="$value" ;;
+                timer-shortcuts) SET_SHORTCUTS="$value" ;;
                 *) [ "$VERBOSE" -eq 1 ] && echo "luxafor-toggle: unknown setting '$key' on line $n in $file" >&2 ;;
             esac
             continue
@@ -104,9 +105,39 @@ resolve_settings() {
         *) THEME=auto
            [ "$VERBOSE" -eq 1 ] && echo "luxafor-toggle: theme '$SET_THEME' should be auto, light or dark" >&2 ;;
     esac
+    resolve_shortcuts
     if [ -n "$SET_CALL" ] && ! index_of "$SET_CALL" >/dev/null && [ "$VERBOSE" -eq 1 ]; then
         echo "luxafor-toggle: call-status '$SET_CALL' is not one of your statuses" >&2
     fi
+}
+
+# SHORTCUTS: "<id> <minutes>" entries for the tray menu, from
+# "timer-shortcuts = busy 30, busy 1h, focus 1h30". Without the setting:
+# the first status that isn't the default one, for 30 min and 1 h.
+# An empty setting ("timer-shortcuts =") means no shortcuts.
+resolve_shortcuts() {
+    SHORTCUTS=()
+    local spec entry id dur secs i
+    if [ "$SET_SHORTCUTS" = "-" ]; then
+        spec=""
+        for i in "${!IDS[@]}"; do
+            if [ "${IDS[$i]}" != "$DEFAULT_STATUS" ]; then
+                spec="${IDS[$i]} 30, ${IDS[$i]} 60"; break
+            fi
+        done
+    else
+        spec="$SET_SHORTCUTS"
+    fi
+    IFS=',' read -ra entries <<< "$spec"
+    for entry in "${entries[@]}"; do
+        read -r id dur _ <<< "$entry"
+        [ -n "$id" ] || continue
+        if index_of "$id" >/dev/null && secs="$(parse_duration "${dur:-}")"; then
+            SHORTCUTS+=("$id $((secs / 60))")
+        elif [ "$VERBOSE" -eq 1 ]; then
+            echo "luxafor-toggle: ignoring timer shortcut '$(trim "$entry")' — use: <status> <duration>, e.g. busy 30" >&2
+        fi
+    done
 }
 
 label_of() {
@@ -301,12 +332,16 @@ while [ $# -gt 0 ]; do
             echo "default-status = $DEFAULT_STATUS"
             echo "call-status    = ${SET_CALL:-(not set — see luxafor-callwatch)}"
             echo "theme          = $THEME"
+            sc=""
+            for e in "${SHORTCUTS[@]}"; do sc+="${sc:+, }$e"; done
+            echo "timer-shortcuts = ${sc:-(none)}"
             exit 0 ;;
         --setting)
             case "${2:-}" in
                 default-status) echo "$DEFAULT_STATUS" ;;
                 call-status) [ -n "$SET_CALL" ] && echo "$SET_CALL" ;;
                 theme) echo "$THEME" ;;
+                timer-shortcuts) [ "${#SHORTCUTS[@]}" -eq 0 ] || printf '%s\n' "${SHORTCUTS[@]}" ;;
                 *) echo "Unknown setting '${2:-}'" >&2; exit 2 ;;
             esac
             exit 0 ;;

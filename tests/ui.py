@@ -28,6 +28,7 @@ with open(f"{TMP}/config/luxafor-status/statuses.conf", "w") as f:
         "call      | yellow  | On a call\n"
         "focus     | #0000ff | Focus — do not disturb\n"
         "default-status = available\n"
+        "timer-shortcuts = focus 1h30, busy 30, nope 10\n"
     )
 os.environ.update(
     HOME=f"{TMP}/home",
@@ -151,18 +152,12 @@ w.cancel_button.clicked()
 eq("cancel timer", calls, [["--cancel-timer"]])
 
 w, calls = new_panel()
-w.on_focus_out()
+w.emit("focus-out-event", Gdk.Event.new(Gdk.EventType.FOCUS_CHANGE))
 pump(0.4)
-eq("focus lost before ever having it → stays open", w.get_visible(), True)
-w.on_focus_in()
-w.is_active = lambda: True   # focus moved to one of its own widgets
-w.on_focus_out()
-pump(0.4)
-eq("focus moving inside the panel → stays open", w.get_visible(), True)
-w.is_active = lambda: False  # click on another window
-w.on_focus_out()
-pump(0.4)
-eq("click elsewhere → closes", w.get_visible(), False)
+eq("losing focus (e.g. while moving it) keeps it open", w.get_visible(), True)
+key(w, Gdk.KEY_Escape)
+pump(0.2)
+eq("Esc closes it", w.get_visible(), False)
 
 toggle("--cancel-timer")
 w, calls = new_panel()
@@ -203,19 +198,46 @@ try:
     tray = tray_ns["Tray"]()
     pump(1.5)
 
-    def labels():
-        return [i.get_label() for i in tray.ind.get_menu().get_children()
-                if not isinstance(i, Gtk.SeparatorMenuItem)]
+    def items():
+        return [i for i in tray.ind.get_menu().get_children()]
 
-    eq("menu: panel first, then statuses",
-       labels(), ["Open panel…", "Available", "Busy", "On a call", "Focus — do not disturb", "Off",
-                  "Edit statuses…", "Quit tray icon"])
-    eq("middle-click opens the panel", tray.ind.get_secondary_activate_target().get_label(), "Open panel…")
-    toggle("busy", "--for", "45")
-    pump(1.5)
+    def labels():
+        return [i.get_label() for i in items() if not isinstance(i, Gtk.SeparatorMenuItem)]
+
+    def sections():
+        out, cur = [], []
+        for i in items():
+            if isinstance(i, Gtk.SeparatorMenuItem):
+                out.append(cur)
+                cur = []
+            else:
+                cur.append(i.get_label())
+        return out + [cur]
+
+    eq("menu sections: statuses / timers / off / settings", sections(), [
+        ["Available", "Busy", "On a call", "Focus — do not disturb"],
+        ["Focus — do not disturb for 1 h 30", "Busy for 30 min", "Other duration…"],
+        ["Off"],
+        ["Edit statuses…", "Quit"],
+    ])
+    eq("middle-click opens the panel", tray.ind.get_secondary_activate_target().get_label(), "Other duration…")
+
+    def click(label):
+        item = next(i for i in items() if i.get_label() == label)
+        item.activate()
+        pump(1.0)
+
+    click("Busy for 30 min")
+    eq("timer shortcut → status set", toggle("--current"), "busy")
+    eq("timer shortcut → 30 min timer", "30 min left" in toggle("--timer"), True)
     tray.tick()
+    pump(0.3)
     eq("timer shown at the top", labels()[:2], [labels()[0], "Cancel timer"])
-    eq("timer line", labels()[0].startswith("⏱ Busy until") and "45 min left" in labels()[0], True)
+    eq("timer line", labels()[0].startswith("⏱ Busy until") and "30 min left" in labels()[0], True)
+    click("Cancel timer")
+    eq("cancel timer from the menu", toggle("--timer"), "No timer.")
+    click("Off")
+    eq("off from the menu", toggle("--current"), "off")
     toggle("--cancel-timer")
 except Exception as e:  # AppIndicator needs a D-Bus session
     FAIL += 1

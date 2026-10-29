@@ -134,11 +134,6 @@ class Panel(Gtk.ApplicationWindow):
         self.set_type_hint(Gdk.WindowTypeHint.DIALOG)
         self.set_icon_name("luxafor-status")
         self.connect("key-press-event", self.on_key)
-        # Close when clicking elsewhere, like a popup — once it has had focus,
-        # so a window manager that doesn't focus new windows can't close it.
-        self.had_focus = False
-        self.connect("focus-in-event", self.on_focus_in)
-        self.connect("focus-out-event", self.on_focus_out)
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         box.get_style_context().add_class("lx-panel")
@@ -267,21 +262,6 @@ class Panel(Gtk.ApplicationWindow):
         return True
 
     # --- actions ---------------------------------------------------------------
-
-    def on_focus_in(self, *_args):
-        self.had_focus = True
-        return False
-
-    def on_focus_out(self, *_args):
-        if self.had_focus:
-            # Let a click on one of our own widgets finish first.
-            GLib.timeout_add(150, self.close_if_unfocused)
-        return False
-
-    def close_if_unfocused(self):
-        if not self.is_active():
-            self.close()
-        return False
 
     def on_duration(self, button, minutes):
         if button.get_active():

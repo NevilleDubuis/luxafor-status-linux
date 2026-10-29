@@ -106,6 +106,12 @@ eq "--cancel-timer keeps the status" "$("$TOGGLE" --current) $("$TOGGLE" --timer
 printf 'default-status = pipe\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
 eq "default-status setting" "$("$TOGGLE" --setting default-status)" pipe
 eq "settings lines are not statuses" "$("$TOGGLE" --list 2>/dev/null | awk '{print $1}' | paste -sd' ')" "dispo focus pipe off"
+eq "timer shortcuts default: first non-default status, 30 min and 1 h" "$("$TOGGLE" --setting timer-shortcuts | paste -sd,)" "dispo 30,dispo 60"
+printf 'timer-shortcuts = focus 1h30, nope 30, focus soon, pipe 15\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+eq "timer shortcuts: valid entries kept, in order" "$("$TOGGLE" --setting timer-shortcuts | paste -sd,)" "focus 90,pipe 15"
+eq "timer shortcuts: invalid entries reported" "$("$TOGGLE" --settings 2>&1 >/dev/null | grep -c 'ignoring timer shortcut')" 2
+printf 'timer-shortcuts =\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+eq "timer shortcuts: empty setting → none" "$("$TOGGLE" --setting timer-shortcuts)" ""
 
 echo "luxafor-callwatch"
 # Fake pactl: "list source-outputs" prints $TMP/streams, "subscribe" reads
