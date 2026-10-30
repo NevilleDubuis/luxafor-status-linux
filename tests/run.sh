@@ -9,7 +9,11 @@ trap 'rm -rf "$TMP"' EXIT
 
 PASS=0; FAIL=0
 ok()   { PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m %s\n' "$1"; }
-fail() { FAIL=$((FAIL + 1)); printf '  \033[31m✗\033[0m %s\n' "$1"; [ -n "${2:-}" ] && printf '      %s\n' "$2"; }
+fail() {
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗\033[0m %s\n' "$1"; [ -n "${2:-}" ] && printf '      %s\n' "$2"
+    # readable in the CI summary
+    if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::error title=Test failed::$1: ${2:-}"; fi
+}
 eq()   { if [ "$2" = "$3" ]; then ok "$1"; else fail "$1" "expected [$3], got [$2]"; fi; }
 
 # Fake devices: a mouse receiver (must be left alone) and two Luxafor lights.

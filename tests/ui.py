@@ -70,6 +70,8 @@ def eq(name, got, want):
     else:
         FAIL += 1
         print(f"  \033[31m✗\033[0m {name}\n      expected [{want}], got [{got}]")
+        if os.environ.get("GITHUB_ACTIONS"):  # readable in the CI summary
+            print(f"::error title=UI test failed::{name}: expected [{want}], got [{got}]")
 
 
 def pump(seconds=0.3):
