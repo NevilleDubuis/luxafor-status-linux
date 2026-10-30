@@ -1,0 +1,23 @@
+[package]
+name = "luxafor-probe"
+version = "0.1.0"
+edition = "2021"
+description = "Checks the v2 building blocks (tray, light, call detection) on a real computer"
+license = "MIT"
+publish = false
+
+[dependencies]
+eframe = { version = "0.37", default-features = false, features = ["clipboard", "default_fonts", "glow", "wayland", "x11"] }
+tray-icon = "0.26"
+hidapi = "2.6"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.56"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
