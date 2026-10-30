@@ -213,7 +213,17 @@ class Panel(Gtk.ApplicationWindow):
         outer.pack_start(self.stack, True, True, 0)
         self.stack.add_titled(self.build_status_page(), "status", "Status")
         self.settings = SettingsPage(on_saved=self.rebuild_status_page)
-        self.stack.add_titled(self.settings, "settings", "Settings")
+        # Scrolls on small screens; as tall as needed (up to ~640 px) otherwise.
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroller.set_propagate_natural_height(True)
+        scroller.set_propagate_natural_width(True)
+        scroller.set_max_content_height(620)
+        scroller.add(self.settings)
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        page.pack_start(scroller, True, True, 0)
+        page.pack_start(self.settings.footer, False, False, 0)
+        self.stack.add_titled(page, "settings", "Settings")
 
         self.refresh_header()
         GLib.timeout_add_seconds(15, self.refresh_header)
@@ -404,7 +414,13 @@ class Panel(Gtk.ApplicationWindow):
 # --- settings -------------------------------------------------------------------
 
 CONF = f"{CONFIG_HOME}/luxafor-status/statuses.conf"
-KNOWN_SETTINGS = ("default-status", "call-status", "timer-shortcuts", "theme")
+KNOWN_SETTINGS = (
+    "default-status", "call-status", "lock-status", "dnd-statuses",
+    "timer-shortcuts", "brightness", "theme",
+)
+# Extra choices of the status combo boxes: (key, label)
+DONT_CHANGE = ("none", "Don't change")
+LIGHT_OFF = ("off", "Light off")
 MAX_SHORTCUTS = 6
 THEMES = [("auto", "Follow the desktop"), ("light", "Light"), ("dark", "Dark")]
 
@@ -420,14 +436,18 @@ def read_settings():
             shortcuts.append((sid, int(minutes)))
         except ValueError:
             pass
-    call = toggle_output("--setting", "call-status").strip()
-    if call not in ids:
-        call = "call" if "call" in ids else (ids[0] if ids else "")
+    try:
+        brightness = int(toggle_output("--setting", "brightness").strip())
+    except ValueError:
+        brightness = 100
     return {
         "statuses": statuses,
         "default-status": toggle_output("--setting", "default-status").strip(),
-        "call-status": call,
+        "call-status": toggle_output("--setting", "call-status").strip() or "none",
+        "lock-status": toggle_output("--setting", "lock-status").strip() or "off",
+        "dnd-statuses": toggle_output("--setting", "dnd-statuses").split(),
         "timer-shortcuts": shortcuts,
+        "brightness": brightness,
         "theme": toggle_output("--setting", "theme").strip() or "auto",
     }
 
@@ -480,7 +500,10 @@ def write_settings(settings, path=CONF):
         "",
         f"default-status = {settings['default-status']}",
         f"call-status = {settings['call-status']}",
+        f"lock-status = {settings['lock-status']}",
+        f"dnd-statuses = {', '.join(settings['dnd-statuses'])}",
         f"timer-shortcuts = {shortcuts}",
+        f"brightness = {settings['brightness']}",
         f"theme = {settings['theme']}",
     ]
     lines += other_setting_lines(path)
@@ -570,12 +593,7 @@ class SettingsPage(Gtk.Box):
         # Statuses
         self.pack_start(Panel.heading("STATUSES"), False, False, 0)
         self.rows_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        scroller = Gtk.ScrolledWindow()
-        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scroller.set_propagate_natural_height(True)
-        scroller.set_max_content_height(240)
-        scroller.add(self.rows_box)
-        self.pack_start(scroller, False, False, 0)
+        self.pack_start(self.rows_box, False, False, 0)  # the whole page scrolls
         add = Gtk.Button(label="Add status")
         add.set_halign(Gtk.Align.START)
         add.connect("clicked", lambda _b: self.add_status())
@@ -585,15 +603,22 @@ class SettingsPage(Gtk.Box):
         grid = Gtk.Grid(column_spacing=10, row_spacing=6)
         self.default_combo = Gtk.ComboBoxText()
         self.call_combo = Gtk.ComboBoxText()
+        self.lock_combo = Gtk.ComboBoxText()
         self.theme_combo = Gtk.ComboBoxText()
         for value, text in THEMES:
             self.theme_combo.append(value, text)
-        for combo in (self.default_combo, self.call_combo, self.theme_combo):
+        for combo in (self.default_combo, self.call_combo, self.lock_combo, self.theme_combo):
             combo.connect("changed", lambda _c: self.changed())
         self.theme_combo.connect("changed", self.on_theme)
+        self.brightness = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 5, 100, 5)
+        self.brightness.set_value_pos(Gtk.PositionType.RIGHT)
+        self.brightness.connect("format-value", lambda _s, v: f"{int(v)} %")
+        self.brightness.connect("value-changed", lambda _s: self.changed())
         for n, (text, combo, tip) in enumerate([
             ("After a timer", self.default_combo, "Status to go back to when a timer ends"),
             ("During calls", self.call_combo, "Status used automatically while you are in a call"),
+            ("Screen locked", self.lock_combo, "Status while the screen is locked; the previous one comes back when you unlock"),
+            ("Brightness", self.brightness, "Brightness of the light"),
             ("Theme", self.theme_combo, "Look of this panel"),
         ]):
             label = Gtk.Label(label=text, xalign=0)
@@ -605,6 +630,18 @@ class SettingsPage(Gtk.Box):
         self.pack_start(Gtk.Box(), False, False, 2)
         self.pack_start(Panel.heading("BEHAVIOR"), False, False, 0)
         self.pack_start(grid, False, False, 0)
+
+        # Do not disturb
+        self.pack_start(Gtk.Box(), False, False, 2)
+        self.pack_start(Panel.heading("DO NOT DISTURB"), False, False, 0)
+        hint = Gtk.Label(label="Silence desktop notifications while:", xalign=0)
+        hint.set_tooltip_text("Optional: you may still want to see incoming call notifications")
+        self.pack_start(hint, False, False, 0)
+        self.dnd_box = Gtk.FlowBox()
+        self.dnd_box.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.dnd_box.set_max_children_per_line(2)
+        self.dnd_box.set_homogeneous(True)
+        self.pack_start(self.dnd_box, False, False, 0)
 
         # Timer shortcuts
         self.pack_start(Gtk.Box(), False, False, 2)
@@ -634,8 +671,10 @@ class SettingsPage(Gtk.Box):
         self.save_button.connect("clicked", lambda _b: self.save())
         bottom.pack_end(self.save_button, False, False, 0)
         bottom.pack_end(self.revert_button, False, False, 0)
-        self.pack_start(Gtk.Separator(), False, False, 4)
-        self.pack_start(bottom, False, False, 0)
+        # Packed by the panel below the scrolling page, so Save stays visible.
+        self.footer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.footer.pack_start(Gtk.Separator(), False, False, 6)
+        self.footer.pack_start(bottom, False, False, 0)
 
         self.load()
 
@@ -644,14 +683,23 @@ class SettingsPage(Gtk.Box):
     def load(self):
         self.loading = True
         settings = read_settings()
-        for child in self.rows_box.get_children() + self.shortcuts_box.get_children():
+        for child in (self.rows_box.get_children() + self.shortcuts_box.get_children()
+                      + self.dnd_box.get_children()):
             child.destroy()
+        for combo in (self.default_combo, self.call_combo, self.lock_combo):
+            combo.remove_all()  # choices come back from the loaded settings
         for sid, color, label in settings["statuses"]:
             self.rows_box.pack_start(StatusRow(self, sid, color, label), False, False, 0)
         for sid, minutes in settings["timer-shortcuts"]:
             self.shortcuts_box.pack_start(ShortcutRow(self, sid, minutes), False, False, 0)
         self.theme_combo.set_active_id(settings["theme"])
-        self.wanted = {"default": settings["default-status"], "call": settings["call-status"]}
+        self.brightness.set_value(settings["brightness"])
+        self.wanted = {
+            "default": settings["default-status"],
+            "call": settings["call-status"],
+            "lock": settings["lock-status"],
+            "dnd": set(settings["dnd-statuses"]),
+        }
         self.refresh_choices()
         self.show_all()
         self.loading = False
@@ -676,20 +724,41 @@ class SettingsPage(Gtk.Box):
         was_loading, self.loading = self.loading, True
         choices = self.choices()
         keys = [k for k, _l in choices]
-        combos = [("default", self.default_combo), ("call", self.call_combo)]
-        combos += [(row, row.status) for row in self.shortcut_rows()]
-        for name, combo in combos:
+        combos = [
+            ("default", self.default_combo, [], []),
+            ("call", self.call_combo, [], [DONT_CHANGE]),
+            ("lock", self.lock_combo, [LIGHT_OFF], [DONT_CHANGE]),
+        ]
+        combos += [(row, row.status, [], []) for row in self.shortcut_rows()]
+        for name, combo, before, after in combos:
             current = combo.get_active_id()
             if current is None:
                 current = self.wanted[name] if isinstance(name, str) else name.wanted
             combo.remove_all()
-            for key, label in choices:
+            entries = before + choices + after
+            for key, label in entries:
                 combo.append(key, label)
-            if current in keys:
+            if current in [k for k, _l in entries]:
                 combo.set_active_id(current)
-            elif keys:
+            elif entries:
                 combo.set_active(0)
+
+        # Do-not-disturb check boxes, one per status
+        checked = {c.key for c in self.dnd_checks() if c.get_active()} if self.dnd_checks() \
+            else self.wanted["dnd"]
+        for child in self.dnd_box.get_children():
+            child.destroy()
+        for key, label in choices:
+            check = Gtk.CheckButton(label=label)
+            check.key = key
+            check.set_active(key in checked)
+            check.connect("toggled", lambda _c: self.changed())
+            self.dnd_box.add(check)
+        self.dnd_box.show_all()
         self.loading = was_loading
+
+    def dnd_checks(self):
+        return [child.get_child() for child in self.dnd_box.get_children()]
 
     def changed(self, statuses=False):
         if self.loading:
@@ -774,7 +843,10 @@ class SettingsPage(Gtk.Box):
         return {
             "statuses": statuses,
             "default-status": keys.get(self.default_combo.get_active_id(), statuses[0][0]),
-            "call-status": keys.get(self.call_combo.get_active_id(), statuses[0][0]),
+            "call-status": keys.get(self.call_combo.get_active_id(), self.call_combo.get_active_id() or "none"),
+            "lock-status": keys.get(self.lock_combo.get_active_id(), self.lock_combo.get_active_id() or "off"),
+            "dnd-statuses": [keys[c.key] for c in self.dnd_checks() if c.get_active() and c.key in keys],
+            "brightness": int(self.brightness.get_value()),
             "timer-shortcuts": [
                 (keys[r.status.get_active_id()], int(r.minutes.get_value()))
                 for r in self.shortcut_rows() if r.status.get_active_id() in keys
@@ -794,6 +866,7 @@ class SettingsPage(Gtk.Box):
             return False
         # Icons and launcher actions; the tray picks the file up by itself.
         toggle_output("--reload")
+        toggle_output("--apply")  # new color or brightness of the current status
         apply_theme(settings["theme"])
         self.load()
         self.message.set_text("Saved.")

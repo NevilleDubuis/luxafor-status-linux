@@ -294,6 +294,26 @@ if "--screenshot" in sys.argv:
     Gdk.pixbuf_get_from_window(win, 0, 0, win.get_width(), win.get_height()).savev(out, "png", [], [])
     print(f"  (screenshot: {out})")
 
+eq("screen locked: light off by default", page.lock_combo.get_active_id(), "off")
+eq("…choices: light off, the statuses, don't change",
+   [page.lock_combo.get_model()[0][0], page.lock_combo.get_model()[len(page.lock_combo.get_model()) - 1][0]],
+   ["Light off", "Don't change"])
+eq("brightness loaded", int(page.brightness.get_value()), 100)
+eq("no dnd status by default", [c.key for c in page.dnd_checks() if c.get_active()], [])
+page.lock_combo.set_active_id("focus")
+page.call_combo.set_active_id("none")
+page.brightness.set_value(60)
+next(c for c in page.dnd_checks() if c.key == "busy").set_active(True)
+eq("save behavior settings", page.save(), True)
+eq("lock-status saved", toggle("--setting", "lock-status"), "focus")
+eq("call-status none saved (call detection off)", toggle("--setting", "call-status"), "none")
+eq("brightness saved", toggle("--setting", "brightness"), "60")
+eq("dnd-statuses saved", toggle("--setting", "dnd-statuses"), "busy")
+eq("reloaded: dnd check box kept", [c.key for c in page.dnd_checks() if c.get_active()], ["busy"])
+page.lock_combo.set_active_id("none")
+page.load()
+eq("revert puts the combo boxes back too", page.lock_combo.get_active_id(), "focus")
+
 page.rows()[0].label.set_text("   ")
 eq("empty name → not saved", page.save(), False)
 eq("…with a message", page.message.get_text(), "Give every status a name.")
