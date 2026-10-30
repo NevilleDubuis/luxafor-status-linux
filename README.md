@@ -43,9 +43,24 @@ open an issue or a PR to report whether it works — even a quick "works for me"
 
 ## Installation
 
-### Debian package (recommended)
+### apt repository (recommended)
 
-Download the latest `.deb` from the
+For Ubuntu, Debian and derivatives — updates come with the rest of your system:
+
+```bash
+curl -fsSL https://nevilledubuis.github.io/luxafor-status-linux/key.asc \
+  | sudo gpg --dearmor -o /usr/share/keyrings/luxafor-status.gpg
+echo "deb [signed-by=/usr/share/keyrings/luxafor-status.gpg] https://nevilledubuis.github.io/luxafor-status-linux stable main" \
+  | sudo tee /etc/apt/sources.list.d/luxafor-status.list
+sudo apt update
+sudo apt install luxafor-status
+```
+
+Use `testing` instead of `stable` to get pre-releases too.
+
+### Debian package
+
+Or download the latest `.deb` from the
 [releases page](https://github.com/NevilleDubuis/luxafor-status-linux/releases/latest),
 then:
 

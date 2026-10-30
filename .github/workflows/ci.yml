@@ -23,7 +23,7 @@ jobs:
           sudo locale-gen fr_CH.UTF-8   # translation tests
 
       - name: ShellCheck
-        run: shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle bin/luxafor-callwatch packaging/build-deb.sh tests/run.sh po/*.sh
+        run: shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle bin/luxafor-callwatch packaging/build-deb.sh packaging/update-apt-repo.sh tests/run.sh po/*.sh
 
       - name: Translations up to date
         run: |

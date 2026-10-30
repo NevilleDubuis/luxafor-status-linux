@@ -56,6 +56,22 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
+The release is also added to the apt repository, a `gh-pages` branch served by
+GitHub Pages: `stable` gets releases, `testing` gets every version
+(`packaging/update-apt-repo.sh`). One-time setup, by the maintainer:
+
+1. Create a signing key, and keep a backup of it:
+   ```bash
+   gpg --quick-gen-key "luxafor-status apt repository" ed25519 sign never
+   gpg --armor --export-secret-keys "luxafor-status apt repository"   # → secret
+   ```
+2. Add the armored secret key as the repository secret `APT_SIGNING_KEY`
+   (Settings → Secrets and variables → Actions).
+3. After the first release, turn on GitHub Pages: Settings → Pages → Deploy
+   from a branch → `gh-pages`, `/ (root)`.
+
+Without the secret, releases still work; only the apt repository is skipped.
+
 For a pre-release, add a suffix: `v0.3.0-beta.1`, `v0.3.0-rc.1`. It is
 published as a GitHub pre-release (so "Latest" keeps pointing to the last
 stable version) and the package version becomes `0.3.0~beta.1`, which apt
@@ -78,7 +94,7 @@ share/applications/    autostart templates (@BINDIR@ is replaced at install time
 udev/                  udev rule granting the logged-in user access to the light
 install.sh             per-user installer (from source)
 uninstall.sh           uninstaller for the per-user install
-packaging/             .deb build script, man pages, AppStream metadata
+packaging/             .deb build script, apt repository script, man pages, AppStream metadata
 tests/run.sh           tests with a fake light
 tests/ui.py            panel and tray tests, under a virtual display
 po/                    translations (gettext): template, *.po, build and update scripts
