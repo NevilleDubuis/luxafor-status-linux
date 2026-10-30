@@ -60,10 +60,12 @@ The release is also added to the apt repository, a `gh-pages` branch served by
 GitHub Pages: `stable` gets releases, `testing` gets every version
 (`packaging/update-apt-repo.sh`). One-time setup, by the maintainer:
 
-1. Create a signing key, and keep a backup of it:
+1. Create a signing key without a passphrase (the workflow signs unattended;
+   the secret is encrypted by GitHub), and keep the exported file somewhere
+   safe — a password manager, an encrypted drive:
    ```bash
-   gpg --quick-gen-key "luxafor-status apt repository" ed25519 sign never
-   gpg --armor --export-secret-keys "luxafor-status apt repository"   # → secret
+   gpg --batch --passphrase '' --quick-gen-key "luxafor-status apt repository" ed25519 sign never
+   gpg --armor --export-secret-keys "luxafor-status apt repository" > luxafor-apt-key.asc
    ```
 2. Add the armored secret key as the repository secret `APT_SIGNING_KEY`
    (Settings → Secrets and variables → Actions).
