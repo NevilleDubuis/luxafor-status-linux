@@ -61,6 +61,20 @@ TIMER = f"{CACHE_HOME}/luxafor-timer"
 # up as "luxafor", hence the unrelated "lxftray-" prefix.
 TRAY_ICON_DIR = f"{DATA_HOME}/icons"
 TRAY_ICON_PREFIX = "lxftray-"
+# Light unplugged: dashed ring. A prefix of its own, for the same reason.
+AWAY_ICON_PREFIX = "lxftrayx-"
+AWAY_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+    '<circle cx="32" cy="32" r="22" fill="none" stroke="{color}" '
+    'stroke-width="8" stroke-dasharray="11 6.3"/></svg>\n'
+)
+LIGHT_IDS = os.environ.get("LUXAFOR_IDS", "04d8:f372").lower().split()
+SYSFS = os.environ.get("LUXAFOR_SYSFS", "/sys")
+# A dock being unplugged can flicker: wait this many checks (1 s apart)
+# before saying the light is gone.
+AWAY_AFTER = 2
+# Freshly plugged in, the light may not be writable yet (udev): retry.
+APPLY_TRIES = 10
 OFF_COLOR = "#9e9e9e"
 
 ID_RE = re.compile(r"^[a-z0-9_-]+$")
@@ -175,21 +189,43 @@ def read_state():
 
 
 def write_tray_icons(statuses):
-    """Writes one icon per status and returns {id: icon name}."""
+    """Writes the icons of each status, light connected or not, and returns
+    ({id: icon name}, {id: icon name when the light is away})."""
     os.makedirs(TRAY_ICON_DIR, exist_ok=True)
-    for old in glob.glob(f"{TRAY_ICON_DIR}/{TRAY_ICON_PREFIX}*.svg"):
-        try:
-            os.remove(old)
-        except OSError:
-            pass
-    names = {}
+    for prefix in (TRAY_ICON_PREFIX, AWAY_ICON_PREFIX):
+        for old in glob.glob(f"{TRAY_ICON_DIR}/{prefix}*.svg"):
+            try:
+                os.remove(old)
+            except OSError:
+                pass
+    names, away = {}, {}
     for sid, color, _label in statuses + [("off", OFF_COLOR, "Off")]:
         digest = hashlib.md5(color.encode()).hexdigest()[:6]
-        name = f"{TRAY_ICON_PREFIX}{sid}-{digest}"
-        with open(f"{TRAY_ICON_DIR}/{name}.svg", "w") as f:
-            f.write(SVG.format(color=color))
-        names[sid] = name
-    return names
+        for prefix, svg, table in ((TRAY_ICON_PREFIX, SVG, names), (AWAY_ICON_PREFIX, AWAY_SVG, away)):
+            name = f"{prefix}{sid}-{digest}"
+            with open(f"{TRAY_ICON_DIR}/{name}.svg", "w") as f:
+                f.write(svg.format(color=color))
+            table[sid] = name
+    return names, away
+
+
+def light_connected():
+    """True if a Luxafor light is plugged in (same lookup as luxafor-light)."""
+    for uevent in glob.glob(f"{SYSFS}/class/hidraw/hidraw*/device/uevent"):
+        try:
+            with open(uevent) as f:
+                hid_id = next((l[7:].strip() for l in f if l.startswith("HID_ID=")), "")
+        except OSError:
+            continue
+        parts = hid_id.lower().split(":")  # 0003:000004D8:0000F372
+        if len(parts) == 3 and f"{parts[1][-4:]}:{parts[2][-4:]}" in LIGHT_IDS:
+            return True
+    return False
+
+
+def notify(text, icon="luxafor-status"):
+    if shutil.which("notify-send"):
+        spawn("notify-send", "-i", icon, "Luxafor", text)
 
 
 def read_timer():
@@ -224,6 +260,13 @@ class Tray:
         self.timer = None        # (end, status) shown in the menu
         self.timer_item = None   # menu line showing the time left
         self.timer_text = None
+        self.away_icons = {}
+        # Light: None until the first check. At startup, the light shows
+        # whatever it was left with: send it the current status.
+        self.connected = None
+        self.missing_checks = 0
+        self.apply_tries = 0
+        self.announce = False    # say "reconnected" once the status is back
         # Restart a timer that was running before logout, or end it if expired.
         spawn(TOGGLE, "--resume-timer")
         self.tick()
@@ -239,7 +282,7 @@ class Tray:
         )
         self.statuses = load_statuses()
         self.shortcuts = load_shortcuts()
-        self.icons = write_tray_icons(self.statuses)
+        self.icons, self.away_icons = write_tray_icons(self.statuses)
         self.build_menu()
         self.last_state = None  # force the icon to be set again
 
@@ -270,6 +313,11 @@ class Tray:
 
         def separator():
             menu.append(Gtk.SeparatorMenuItem())
+
+        # Light unplugged
+        if self.connected is False:
+            add("⚠ Light not connected", enabled=False)
+            separator()
 
         # Running timer
         self.timer_item = None
@@ -314,14 +362,53 @@ class Tray:
         if mtime != self.mtime:
             self.mtime = mtime
             self.reload()
+        self.update_light()
         state = read_state()
         if state not in self.icons:
             state = "off"
-        if state != self.last_state:
-            self.ind.set_icon_full(self.icons[state], self.label_of(state))
-            self.last_state = state
+        shown = (state, self.connected)
+        if shown != self.last_state:
+            if self.connected is False:
+                self.ind.set_icon_full(self.away_icons[state], f"{self.label_of(state)} — light not connected")
+            else:
+                self.ind.set_icon_full(self.icons[state], self.label_of(state))
+            self.last_state = shown
         self.update_timer()
         reap_children()
+
+    def update_light(self):
+        """Notices the light being unplugged (laptop leaving its dock) and
+        plugged back in, and shows the current status on it again."""
+        if light_connected():
+            self.missing_checks = 0
+            if self.connected is not True:
+                self.announce = self.connected is False  # not at startup
+                self.connected = True
+                self.apply_tries = APPLY_TRIES
+                self.build_menu()
+        else:
+            self.missing_checks += 1
+            if self.connected is None or (self.connected and self.missing_checks >= AWAY_AFTER):
+                was_connected = self.connected
+                self.connected = False
+                self.apply_tries = 0
+                self.build_menu()
+                if was_connected:
+                    state = self.label_of(read_state())
+                    notify(f"Light disconnected — {state} will be shown again when it's plugged back in")
+        if self.apply_tries:
+            self.apply_tries -= 1
+            done = subprocess.run(
+                [TOGGLE, "--apply"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL, check=False, timeout=10,
+            ).returncode == 0
+            if done:
+                self.apply_tries = 0
+                if self.announce:
+                    notify(f"Light reconnected — {self.label_of(read_state())}")
+                    self.announce = False
+            elif not self.apply_tries:
+                log("could not show the status on the light after it was plugged in")
 
     def update_timer(self):
         timer = read_timer()

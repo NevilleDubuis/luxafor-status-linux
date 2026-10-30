@@ -19,6 +19,9 @@ moves to the next status, in the order of the configuration file, then off.
 With a status
 .IR id ,
 it sets that status. A desktop notification shows the new status.
+.PP
+Without a light connected (laptop away from its dock), the status is still
+set and kept; the light shows it once it is plugged back in.
 .SH OPTIONS
 .TP
 .BI \-\-for " duration"
@@ -48,6 +51,10 @@ List the configured statuses.
 .TP
 .B \-\-current
 Print the id of the current status.
+.TP
+.B \-\-apply
+Show the current status on the light again, e.g. after plugging it back in
+(the tray does it by itself). Exit status 3 if no light is connected.
 .TP
 .B \-\-edit
 Open the status configuration in an editor (created from the defaults

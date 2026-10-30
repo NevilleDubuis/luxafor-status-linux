@@ -20,7 +20,7 @@ rm -f  "$BINDIR/luxafor-light" "$BINDIR/luxafor-toggle" "$BINDIR/luxafor-tray" "
        "$BINDIR/luxafor-panel"
 rm -f  "$DATA_HOME/applications/luxafor.desktop" "$DATA_HOME/applications/luxafor-panel.desktop"
 rm -f  "$DATA_HOME/icons/hicolor/scalable/apps/luxafor-status.svg"
-rm -f  "$DATA_HOME"/icons/lxftray-*.svg
+rm -f  "$DATA_HOME"/icons/lxftray-*.svg "$DATA_HOME"/icons/lxftrayx-*.svg
 rm -rf "$DATA_HOME/luxafor-status"
 rm -f  "$CONFIG_HOME/autostart/luxafor-tray.desktop" "$CONFIG_HOME/autostart/luxafor-callwatch.desktop"
 rm -f  "$CACHE_HOME/luxafor-state"

@@ -390,7 +390,28 @@ try:
     eq("error logged to ~/.cache/luxafor-tray.log", "RuntimeError: boom" in log, True)
     toggle("busy")
     pump(1.5)
-    eq("updates go on after the error", tray.last_state, "busy")
+    eq("updates go on after the error", tray.last_state, ("busy", True))
+
+    # Laptop leaves its dock: the light disappears, then comes back.
+    uevent = f"{TMP}/sys/class/hidraw/hidraw0/device/uevent"
+    os.rename(uevent, uevent + ".away")
+    tray.update_light()  # first check right after: no pump in between
+    eq("one missed check isn't enough (dock flicker)", tray.connected, True)
+    pump(2.2)
+    eq("light unplugged → noticed", tray.connected, False)
+    eq("…dashed icon", tray.ind.get_icon().startswith("lxftrayx-busy-"), True)
+    eq("…warning at the top of the menu", labels()[0], "⚠ Light not connected")
+    toggle("call")
+    pump(1.2)
+    eq("status changed while away → kept", toggle("--current"), "call")
+    eq("…and shown on the dashed icon", tray.ind.get_icon().startswith("lxftrayx-call-"), True)
+    open(f"{TMP}/dev/hidraw0", "w").close()
+    os.rename(uevent + ".away", uevent)
+    pump(1.5)
+    eq("light plugged back → noticed", tray.connected, True)
+    eq("…status shown on the light again", open(f"{TMP}/dev/hidraw0", "rb").read().hex(), "0001ffffff00000000")  # call = yellow
+    eq("…normal icon", tray.ind.get_icon().startswith("lxftray-call-"), True)
+    eq("…warning gone", labels()[0] != "⚠ Light not connected", True)
     toggle("--cancel-timer")
 except Exception as e:  # AppIndicator needs a D-Bus session
     FAIL += 1
