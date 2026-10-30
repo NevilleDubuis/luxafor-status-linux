@@ -1,0 +1,62 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Architectures: all amd64 arm64 armhf i386
+Codename: testing
+Components: main
+Date: Fri, 30 Oct 2026 14:29:57 +0000
+Description: luxafor-status (testing)
+Label: luxafor-status
+Origin: luxafor-status
+Suite: testing
+MD5Sum:
+ 96f9e9073918a317a361a14eaa94378e             1232 main/binary-all/Packages
+ 7a313d4ab11f2b51467d9c933c31a631              815 main/binary-all/Packages.gz
+ 96f9e9073918a317a361a14eaa94378e             1232 main/binary-amd64/Packages
+ 7a313d4ab11f2b51467d9c933c31a631              815 main/binary-amd64/Packages.gz
+ 96f9e9073918a317a361a14eaa94378e             1232 main/binary-arm64/Packages
+ 7a313d4ab11f2b51467d9c933c31a631              815 main/binary-arm64/Packages.gz
+ 96f9e9073918a317a361a14eaa94378e             1232 main/binary-armhf/Packages
+ 7a313d4ab11f2b51467d9c933c31a631              815 main/binary-armhf/Packages.gz
+ 96f9e9073918a317a361a14eaa94378e             1232 main/binary-i386/Packages
+ 7a313d4ab11f2b51467d9c933c31a631              815 main/binary-i386/Packages.gz
+SHA1:
+ 88b0a49bc86b3e2a5adde2b327992c06db6da4d1             1232 main/binary-all/Packages
+ 2a953f5c3380858282edc383073b453b05e5aa5c              815 main/binary-all/Packages.gz
+ 88b0a49bc86b3e2a5adde2b327992c06db6da4d1             1232 main/binary-amd64/Packages
+ 2a953f5c3380858282edc383073b453b05e5aa5c              815 main/binary-amd64/Packages.gz
+ 88b0a49bc86b3e2a5adde2b327992c06db6da4d1             1232 main/binary-arm64/Packages
+ 2a953f5c3380858282edc383073b453b05e5aa5c              815 main/binary-arm64/Packages.gz
+ 88b0a49bc86b3e2a5adde2b327992c06db6da4d1             1232 main/binary-armhf/Packages
+ 2a953f5c3380858282edc383073b453b05e5aa5c              815 main/binary-armhf/Packages.gz
+ 88b0a49bc86b3e2a5adde2b327992c06db6da4d1             1232 main/binary-i386/Packages
+ 2a953f5c3380858282edc383073b453b05e5aa5c              815 main/binary-i386/Packages.gz
+SHA256:
+ 1ea2120276bba700c3c3ee97e621753a797fec697547c5c9da8b1fbaed2eff93             1232 main/binary-all/Packages
+ c4efc598f4b04c61655df2ada9497d3b590a96a712fd285822e3d24c7dba1bac              815 main/binary-all/Packages.gz
+ 1ea2120276bba700c3c3ee97e621753a797fec697547c5c9da8b1fbaed2eff93             1232 main/binary-amd64/Packages
+ c4efc598f4b04c61655df2ada9497d3b590a96a712fd285822e3d24c7dba1bac              815 main/binary-amd64/Packages.gz
+ 1ea2120276bba700c3c3ee97e621753a797fec697547c5c9da8b1fbaed2eff93             1232 main/binary-arm64/Packages
+ c4efc598f4b04c61655df2ada9497d3b590a96a712fd285822e3d24c7dba1bac              815 main/binary-arm64/Packages.gz
+ 1ea2120276bba700c3c3ee97e621753a797fec697547c5c9da8b1fbaed2eff93             1232 main/binary-armhf/Packages
+ c4efc598f4b04c61655df2ada9497d3b590a96a712fd285822e3d24c7dba1bac              815 main/binary-armhf/Packages.gz
+ 1ea2120276bba700c3c3ee97e621753a797fec697547c5c9da8b1fbaed2eff93             1232 main/binary-i386/Packages
+ c4efc598f4b04c61655df2ada9497d3b590a96a712fd285822e3d24c7dba1bac              815 main/binary-i386/Packages.gz
+SHA512:
+ 60cdf7692696db512f2319e886c874274957e1c3b92595435e35036d85b51c39db72fd989464a2e0401fff75ec0c9f368a2f36c49abf1eaa3f302f145094d5e3             1232 main/binary-all/Packages
+ d61f6d796576c547921f159de786f45b0c18a614c1475f6e47abf253351bae1e835ac1cb172c23eb6e6c30d4a16574e109d308d820b3ef7883b7e2b0e2620ae5              815 main/binary-all/Packages.gz
+ 60cdf7692696db512f2319e886c874274957e1c3b92595435e35036d85b51c39db72fd989464a2e0401fff75ec0c9f368a2f36c49abf1eaa3f302f145094d5e3             1232 main/binary-amd64/Packages
+ d61f6d796576c547921f159de786f45b0c18a614c1475f6e47abf253351bae1e835ac1cb172c23eb6e6c30d4a16574e109d308d820b3ef7883b7e2b0e2620ae5              815 main/binary-amd64/Packages.gz
+ 60cdf7692696db512f2319e886c874274957e1c3b92595435e35036d85b51c39db72fd989464a2e0401fff75ec0c9f368a2f36c49abf1eaa3f302f145094d5e3             1232 main/binary-arm64/Packages
+ d61f6d796576c547921f159de786f45b0c18a614c1475f6e47abf253351bae1e835ac1cb172c23eb6e6c30d4a16574e109d308d820b3ef7883b7e2b0e2620ae5              815 main/binary-arm64/Packages.gz
+ 60cdf7692696db512f2319e886c874274957e1c3b92595435e35036d85b51c39db72fd989464a2e0401fff75ec0c9f368a2f36c49abf1eaa3f302f145094d5e3             1232 main/binary-armhf/Packages
+ d61f6d796576c547921f159de786f45b0c18a614c1475f6e47abf253351bae1e835ac1cb172c23eb6e6c30d4a16574e109d308d820b3ef7883b7e2b0e2620ae5              815 main/binary-armhf/Packages.gz
+ 60cdf7692696db512f2319e886c874274957e1c3b92595435e35036d85b51c39db72fd989464a2e0401fff75ec0c9f368a2f36c49abf1eaa3f302f145094d5e3             1232 main/binary-i386/Packages
+ d61f6d796576c547921f159de786f45b0c18a614c1475f6e47abf253351bae1e835ac1cb172c23eb6e6c30d4a16574e109d308d820b3ef7883b7e2b0e2620ae5              815 main/binary-i386/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iHUEARYKAB0WIQTqOfcsyjpKQA813JbbwsnCvvfhqAUCauSp5QAKCRDbwsnCvvfh
+qFF6AQDu2C1oeFbxSksoV9XRdZRNat7bmq09D1FI976UB6hsRQEA96fgbtUcQhuj
++zHOs898m2j3k+1IMgzvHQ3DYHU6QAI=
+=7MFL
+-----END PGP SIGNATURE-----

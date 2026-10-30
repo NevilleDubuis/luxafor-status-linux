@@ -1,0 +1,25 @@
+Package: luxafor-status
+Architecture: all
+Version: 1.0.0~rc.2
+Priority: optional
+Section: utils
+Maintainer: Néville Dubuis <ndubuis@gmail.com>
+Installed-Size: 292
+Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1, pulseaudio-utils, gettext-base
+Recommends: libnotify-bin, xdg-utils
+Filename: pool/testing/luxafor-status_1.0.0~rc.2_all.deb
+Size: 41708
+MD5sum: 31be2ccb470b78242e5c33dc4d3c3e04
+SHA1: 02476ef4302b6ec1b9243ab5d240a508d74cc9ba
+SHA256: 08515a13e53bcfbd3828d4ead61273a09256efa5abdc7f16efac58663e75932c
+SHA512: c15a6797d7cb2d04e4e0ab8cc2bcc71b42b3f0a148c668195606b518a091ca000b6f6434b650e7a682bb557c969533571f2b81d63fafc2b094f690aab3b7c377
+Homepage: https://github.com/NevilleDubuis/luxafor-status-linux
+Description: control a Luxafor status light (ORB, Flag) from the desktop
+ Sets the color of a Luxafor USB status light from a dock launcher, a
+ system tray icon showing the current status, or the command line, and
+ switches it to a chosen status automatically while you are in a call.
+ .
+ Statuses (name and color) are configurable per user. The light is driven
+ directly through its USB HID protocol, with no extra driver; a udev rule
+ gives the logged-in user access to it without sudo.
+
