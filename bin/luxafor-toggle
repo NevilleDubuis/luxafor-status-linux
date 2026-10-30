@@ -58,6 +58,7 @@ die() { echo "luxafor-toggle: $1" >&2; notify "$1"; exit "${2:-1}"; }
 # settings ("key = value" lines) into SET_DEFAULT / SET_CALL.
 load_statuses() {
     IDS=(); COLORS=(); LABELS=(); SET_DEFAULT=""; SET_CALL=""; SET_THEME=""; SET_SHORTCUTS="-"
+    SET_LOCK=""; SET_DND=""; SET_BRIGHTNESS=""; SET_APPS=""
     local file="$CONF" line id color label key value n=0
     [ -f "$file" ] || file="$DEFAULT_CONF"
     if [ ! -f "$file" ]; then
@@ -76,6 +77,10 @@ load_statuses() {
                 call-status)    SET_CALL="$value" ;;
                 theme)          SET_THEME="$value" ;;
                 timer-shortcuts) SET_SHORTCUTS="$value" ;;
+                lock-status)    SET_LOCK="$value" ;;
+                dnd-statuses)   SET_DND="$value" ;;
+                brightness)     SET_BRIGHTNESS="$value" ;;
+                call-apps)      SET_APPS="$value" ;;
                 *) [ "$VERBOSE" -eq 1 ] && echo "luxafor-toggle: unknown setting '$key' on line $n in $file" >&2 ;;
             esac
             continue
@@ -109,9 +114,50 @@ resolve_settings() {
            [ "$VERBOSE" -eq 1 ] && echo "luxafor-toggle: theme '$SET_THEME' should be auto, light or dark" >&2 ;;
     esac
     resolve_shortcuts
-    if [ -n "$SET_CALL" ] && ! index_of "$SET_CALL" >/dev/null && [ "$VERBOSE" -eq 1 ]; then
-        echo "luxafor-toggle: call-status '$SET_CALL' is not one of your statuses" >&2
+
+    # CALL_STATUS: status during calls, or "none" (no call detection).
+    if [ "$SET_CALL" = none ] || { [ -n "$SET_CALL" ] && index_of "$SET_CALL" >/dev/null; }; then
+        CALL_STATUS="$SET_CALL"
+    else
+        if [ -n "$SET_CALL" ] && [ "$VERBOSE" -eq 1 ]; then
+            echo "luxafor-toggle: call-status '$SET_CALL' is not one of your statuses" >&2
+        fi
+        if index_of call >/dev/null; then CALL_STATUS=call; else CALL_STATUS=none; fi
     fi
+
+    # LOCK_STATUS: status while the screen is locked, "off", or "none" (leave
+    # the status alone). Default: off.
+    if [ "$SET_LOCK" = none ] || [ "$SET_LOCK" = off ] || { [ -n "$SET_LOCK" ] && index_of "$SET_LOCK" >/dev/null; }; then
+        LOCK_STATUS="$SET_LOCK"
+    else
+        if [ -n "$SET_LOCK" ] && [ "$VERBOSE" -eq 1 ]; then
+            echo "luxafor-toggle: lock-status '$SET_LOCK' is not one of your statuses" >&2
+        fi
+        LOCK_STATUS=off
+    fi
+
+    # DND_STATUSES: statuses during which desktop notifications are silenced.
+    DND_STATUSES=()
+    local d
+    for d in ${SET_DND//,/ }; do
+        if index_of "$d" >/dev/null; then DND_STATUSES+=("$d")
+        elif [ "$VERBOSE" -eq 1 ]; then
+            echo "luxafor-toggle: dnd-statuses: '$d' is not one of your statuses" >&2
+        fi
+    done
+
+    # BRIGHTNESS: 5–100 %.
+    if [[ "$SET_BRIGHTNESS" =~ ^[0-9]+$ ]] && [ "$SET_BRIGHTNESS" -ge 5 ] && [ "$SET_BRIGHTNESS" -le 100 ]; then
+        BRIGHTNESS="$SET_BRIGHTNESS"
+    else
+        if [ -n "$SET_BRIGHTNESS" ] && [ "$VERBOSE" -eq 1 ]; then
+            echo "luxafor-toggle: brightness '$SET_BRIGHTNESS' should be a percentage from 5 to 100" >&2
+        fi
+        BRIGHTNESS=100
+    fi
+
+    # CALL_APPS: applications that count as "in a call" when recording.
+    CALL_APPS="${SET_APPS:-firefox chrome chromium brave msedge edge vivaldi opera epiphany falkon}"
 }
 
 # SHORTCUTS: "<id> <minutes>" entries for the tray menu, from
@@ -304,7 +350,7 @@ light() {
         ERR="$("$LIGHT" off 2>&1)"
     else
         i="$(index_of "$1")"
-        ERR="$("$LIGHT" "${COLORS[$i]}" 2>&1)"
+        ERR="$(LUXAFOR_BRIGHTNESS="$BRIGHTNESS" "$LIGHT" "${COLORS[$i]}" 2>&1)"
     fi
 }
 
@@ -360,17 +406,25 @@ while [ $# -gt 0 ]; do
         --reload)
             reload; echo "Statuses reloaded."; exit 0 ;;
         --settings)
-            echo "default-status = $DEFAULT_STATUS"
-            echo "call-status    = ${SET_CALL:-(not set — see luxafor-callwatch)}"
-            echo "theme          = $THEME"
             sc=""
             for e in "${SHORTCUTS[@]}"; do sc+="${sc:+, }$e"; done
+            echo "default-status  = $DEFAULT_STATUS"
+            echo "call-status     = $CALL_STATUS"
+            echo "call-apps       = $CALL_APPS"
+            echo "lock-status     = $LOCK_STATUS"
+            echo "dnd-statuses    = ${DND_STATUSES[*]:-(none)}"
             echo "timer-shortcuts = ${sc:-(none)}"
+            echo "brightness      = $BRIGHTNESS"
+            echo "theme           = $THEME"
             exit 0 ;;
         --setting)
             case "${2:-}" in
                 default-status) echo "$DEFAULT_STATUS" ;;
-                call-status) [ -n "$SET_CALL" ] && echo "$SET_CALL" ;;
+                call-status) echo "$CALL_STATUS" ;;
+                call-apps) echo "$CALL_APPS" ;;
+                lock-status) echo "$LOCK_STATUS" ;;
+                dnd-statuses) echo "${DND_STATUSES[*]}" ;;
+                brightness) echo "$BRIGHTNESS" ;;
                 theme) echo "$THEME" ;;
                 timer-shortcuts) [ "${#SHORTCUTS[@]}" -eq 0 ] || printf '%s\n' "${SHORTCUTS[@]}" ;;
                 *) echo "Unknown setting '${2:-}'" >&2; exit 2 ;;

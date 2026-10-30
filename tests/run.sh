@@ -142,6 +142,21 @@ eq "timer expired while logged out → default status at login" "$("$TOGGLE" --c
 eq "--cancel-timer keeps the status" "$("$TOGGLE" --current) $("$TOGGLE" --timer)" "focus No timer."
 printf 'default-status = pipe\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
 eq "default-status setting" "$("$TOGGLE" --setting default-status)" pipe
+eq "brightness defaults to 100" "$("$TOGGLE" --setting brightness)" 100
+eq "lock-status defaults to off" "$("$TOGGLE" --setting lock-status)" off
+eq "dnd-statuses default to none" "$("$TOGGLE" --setting dnd-statuses)" ""
+eq "call-apps default to the usual browsers" "$("$TOGGLE" --setting call-apps | cut -d' ' -f1-2)" "firefox chrome"
+printf 'brightness = 40\nlock-status = pipe\ndnd-statuses = focus, nope pipe\ncall-apps = firefox teams\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+eq "brightness setting" "$("$TOGGLE" --setting brightness)" 40
+eq "lock-status setting" "$("$TOGGLE" --setting lock-status)" pipe
+eq "dnd-statuses: valid ids kept" "$("$TOGGLE" --setting dnd-statuses)" "focus pipe"
+eq "call-apps setting" "$("$TOGGLE" --setting call-apps)" "firefox teams"
+"$TOGGLE" focus >/dev/null 2>&1
+eq "brightness 40 % → colors scaled" "$(bytes hidraw1)" "00 01 ff 00 00 66 00 00 00"
+printf 'brightness = 300\nlock-status = nope\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+eq "invalid brightness → 100" "$("$TOGGLE" --setting brightness)" 100
+eq "invalid lock-status → off" "$("$TOGGLE" --setting lock-status)" off
+printf 'brightness = 100\nlock-status =\ndnd-statuses =\ncall-apps =\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
 eq "settings lines are not statuses" "$("$TOGGLE" --list 2>/dev/null | awk '{print $1}' | paste -sd' ')" "dispo focus pipe off"
 eq "timer shortcuts default: first non-default status, 30 min and 1 h" "$("$TOGGLE" --setting timer-shortcuts | paste -sd,)" "dispo 30,dispo 60"
 printf 'timer-shortcuts = focus 1h30, nope 30, focus soon, pipe 15\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
@@ -176,7 +191,7 @@ stop_watch() {
     exec 3>&-
 }
 export PATH="$TMP/fakebin:$PATH" LUXAFOR_CALL_END_DELAY=1
-printf 'status = focus   # blue during calls\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
+printf 'call-status = focus   # blue during calls\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
 
 stream 41 "Audio Recorder" gnome-sound-recorder > "$TMP/streams"
 eq "--check ignores non-browser apps" "$("$WATCH" --check | tail -1)" "→ Not a call."
@@ -209,11 +224,19 @@ stream 60 Firefox firefox > "$TMP/streams"; event new 60
 : > "$TMP/streams"; event remove 60; sleep 1.5
 eq "status changed during the call is kept" "$("$TOGGLE" --current)" pipe
 
+printf 'call-status = none\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+"$TOGGLE" dispo >/dev/null 2>&1
+stream 61 Firefox firefox > "$TMP/streams"; event new 61
+eq "call-status = none → status left alone (read at each call)" "$("$TOGGLE" --current)" dispo
+: > "$TMP/streams"; event remove 61; sleep 1.5
 stop_watch
-printf 'status = nope\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
-"$WATCH" 2>/dev/null; eq "unknown call status exits 1" "$?" 1
-printf 'enabled = no\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
-"$WATCH" 2>/dev/null; eq "enabled = no exits cleanly" "$?" 0
+printf 'status = focus\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
+exec 3<>"$TMP/events"
+"$WATCH" 2>"$TMP/old.err" & WATCH_PID=$!
+sleep 0.5
+eq "old callwatch.conf → says it's no longer read" "$(grep -c 'no longer read' "$TMP/old.err")" 1
+stop_watch
+rm -f "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
 
 
 echo "luxafor-callwatch with settings and timers"
@@ -224,14 +247,13 @@ tel   | purple  | Au téléphone
 default-status = dispo
 call-status    = tel
 CONF
-printf 'status = focus\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"   # legacy, overridden
 : > "$TMP/streams"
 exec 3<>"$TMP/events"
 "$WATCH" 2>/dev/null & WATCH_PID=$!
 sleep 0.5
 "$TOGGLE" focus --for 30 >/dev/null 2>&1
 stream 80 Firefox firefox > "$TMP/streams"; event new 80
-eq "call-status from statuses.conf wins" "$("$TOGGLE" --current)" tel
+eq "call-status from statuses.conf" "$("$TOGGLE" --current)" tel
 eq "a call doesn't cancel the timer" "$([ -f "$TIMERF" ] && echo yes || echo no)" yes
 : > "$TMP/streams"; event remove 80; sleep 1.5
 eq "call ends, timer still running → back to the timed status" "$("$TOGGLE" --current)" focus

@@ -13,6 +13,7 @@
 # the udev rule installed with luxafor-status.
 #
 # Environment:
+#   LUXAFOR_BRIGHTNESS  brightness in percent, 5–100 (default: 100)
 #   LUXAFOR_IDS     space-separated vendor:product IDs to look for
 #                   (default: 04d8:f372)
 #   LUXAFOR_SYSFS   sysfs root, for tests (default: /sys)
@@ -119,6 +120,11 @@ case "${1:-}" in
         send 1 255 0 0 0 0 0 0 ;;
     *)
         rgb="$(parse_color "$1")" || die "unknown color '$1' — use a name (red, orange…) or a hex code (#ff8800)" 2
+        b="${LUXAFOR_BRIGHTNESS:-100}"
+        if [[ "$b" =~ ^[0-9]+$ ]] && [ "$b" -ge 1 ] && [ "$b" -lt 100 ]; then
+            read -r r g bl <<< "$rgb"
+            rgb="$(( (r * b + 50) / 100 )) $(( (g * b + 50) / 100 )) $(( (bl * b + 50) / 100 ))"
+        fi
         # shellcheck disable=SC2086  # split "R G B" into three arguments
         send 1 255 $rgb 0 0 0 ;;
 esac

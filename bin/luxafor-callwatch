@@ -12,18 +12,14 @@
 # (luxafor-toggle busy --for 30) keeps running; if it ended during the call,
 # the light goes to the default status instead.
 #
-# The call status is set in statuses.conf (luxafor-toggle --edit):
-#   call-status = call
-#
-# Other settings: ~/.config/luxafor-status/callwatch.conf
-#   apps   = firefox chrome chromium …   # names matched against the app
-#   enabled = yes                        # "no" to turn detection off
-#   status = call                        # older place for the call status,
-#                                        # used if statuses.conf has none
+# Settings, in statuses.conf (Luxafor Panel → Settings, or luxafor-toggle
+# --edit), read at each call so changes apply right away:
+#   call-status = call                   # status during calls; "none": off
+#   call-apps = firefox chrome chromium …   # names matched against the app
 set -u
 
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
-CONF="$CONFIG_HOME/luxafor-status/callwatch.conf"
+OLD_CONF="$CONFIG_HOME/luxafor-status/callwatch.conf"
 TIMER="${XDG_CACHE_HOME:-$HOME/.cache}/luxafor-timer"
 BINDIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 TOGGLE="$BINDIR/luxafor-toggle"
@@ -33,9 +29,7 @@ TOGGLE="$BINDIR/luxafor-toggle"
 # the microphone stream (device change, reconnection) during a call.
 END_DELAY="${LUXAFOR_CALL_END_DELAY:-4}"
 
-STATUS=call          # from callwatch.conf (legacy); see call_status
-APPS="firefox chrome chromium brave msedge edge vivaldi opera epiphany falkon"
-ENABLED=yes
+APPS=""  # watched applications, see load_apps
 
 log() { echo "luxafor-callwatch: $*" >&2; }
 
@@ -50,20 +44,8 @@ alert() {
 
 trim() { local s="$1"; s="${s#"${s%%[![:space:]]*}"}"; printf '%s' "${s%"${s##*[![:space:]]}"}"; }
 
-load_config() {
-    [ -f "$CONF" ] || return 0
-    local line key value
-    while IFS= read -r line || [ -n "$line" ]; do
-        line="$(trim "${line%%#*}")"
-        [ -n "$line" ] || continue
-        key="$(trim "${line%%=*}")"; value="$(trim "${line#*=}")"
-        case "$key" in
-            status)  STATUS="$value" ;;
-            apps)    APPS="$value" ;;
-            enabled) ENABLED="$value" ;;
-            *) log "unknown setting '$key' in $CONF" ;;
-        esac
-    done < "$CONF"
+load_apps() {
+    APPS="$("$TOGGLE" --setting call-apps 2>/dev/null)"
 }
 
 # Prints one line per microphone stream: "<binary>|<application name>".
@@ -89,19 +71,12 @@ in_call() {
     return 1
 }
 
-# The call status: "call-status" in statuses.conf, else "status" in
-# callwatch.conf, else "call". Read at each call, so edits apply right away.
-call_status() {
-    local s
-    s="$("$TOGGLE" --setting call-status 2>/dev/null)"
-    echo "${s:-$STATUS}"
-}
-
-valid_status() { "$TOGGLE" --list 2>/dev/null | awk '{print $1}' | grep -qx -- "$1"; }
+# The call status ("none": don't change the status during calls).
+call_status() { "$TOGGLE" --setting call-status 2>/dev/null || echo none; }
 
 check() {
-    load_config
-    echo "Call status: $(call_status)    Watched apps: $APPS    Enabled: $ENABLED"
+    load_apps
+    echo "Call status: $(call_status)    Watched apps: $APPS"
     echo
     local streams
     streams="$(mic_streams)"
@@ -120,7 +95,7 @@ check() {
 # --- main ---------------------------------------------------------------------
 
 case "${1:-}" in
-    -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     --check)
         command -v pactl >/dev/null 2>&1 || { log "pactl not found — install pulseaudio-utils"; exit 1; }
         check; exit 0 ;;
@@ -142,13 +117,9 @@ echo $$ > "$PIDFILE"
 trap 'rm -f "$PIDFILE"' EXIT
 trap 'exit 0' TERM INT HUP
 
-load_config
-if [ "$ENABLED" != yes ]; then
-    log "disabled in $CONF"; exit 0
-fi
 command -v pactl >/dev/null 2>&1 || { alert "pactl not found — install it with: sudo apt install pulseaudio-utils"; exit 1; }
-if ! valid_status "$(call_status)"; then
-    alert "call status '$(call_status)' is not one of your statuses (see luxafor-toggle --list)"; exit 1
+if [ -f "$OLD_CONF" ]; then
+    alert "callwatch.conf is no longer read: set the call status and the watched apps in Luxafor Panel → Settings (call-status, call-apps in statuses.conf)"
 fi
 
 ACTIVE=0      # 1 while we have switched the light to the call status
@@ -158,13 +129,11 @@ TIMER_END=""  # end of the timer that was running when the call started
 
 evaluate() {
     local back
+    load_apps
     if in_call; then
         if [ "$ACTIVE" -eq 0 ]; then
             CALL="$(call_status)"
-            if ! valid_status "$CALL"; then
-                alert "call status '$CALL' is not one of your statuses (see luxafor-toggle --list)"
-                return
-            fi
+            [ "$CALL" != none ] || return 0   # call detection turned off
             PREVIOUS="$("$TOGGLE" --current)"
             TIMER_END="$(cut -d' ' -f1 "$TIMER" 2>/dev/null)"
             if [ "$PREVIOUS" != "$CALL" ]; then
