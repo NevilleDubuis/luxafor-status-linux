@@ -20,6 +20,28 @@
 #   LUXAFOR_DEV     /dev root, for tests (default: /dev)
 set -u
 
+# --- translations (gettext domain luxafor-status) -----------------------------
+TEXTDOMAIN=luxafor-status
+TEXTDOMAINDIR=""
+for _dir in "${LUXAFOR_LOCALEDIR:-}" "${XDG_DATA_HOME:-$HOME/.local/share}/locale" \
+            /usr/local/share/locale /usr/share/locale; do
+    if [ -n "$_dir" ] && compgen -G "$_dir/*/LC_MESSAGES/$TEXTDOMAIN.mo" >/dev/null; then
+        TEXTDOMAINDIR="$_dir"; break
+    fi
+done
+export TEXTDOMAIN TEXTDOMAINDIR
+# t "text": translated text. tf "format" args…: translated printf format.
+t() {
+    if [ -n "$TEXTDOMAINDIR" ] && command -v gettext >/dev/null 2>&1; then gettext "$1"
+    else printf '%s' "$1"; fi
+}
+tf() {
+    local format
+    format="$(t "$1")"; shift
+    # shellcheck disable=SC2059  # the format is the (translated) message
+    printf -- "$format" "$@"
+}
+
 IDS="${LUXAFOR_IDS:-04d8:f372}"
 SYSFS="${LUXAFOR_SYSFS:-/sys}"
 DEV="${LUXAFOR_DEV:-/dev}"
@@ -87,7 +109,7 @@ find_lights() {
 send() {
     local lights name sent=0 failed=0 bytes
     lights="$(find_lights)"
-    [ -n "$lights" ] || die "no Luxafor light found — is it plugged in?" 3
+    [ -n "$lights" ] || die "$(t "no Luxafor light found — is it plugged in?")" 3
     bytes="$(printf '\\x%02x' 0 "$@")"
     while IFS=$'\t' read -r name _; do
         # shellcheck disable=SC2059  # the format string is built from hex escapes on purpose
@@ -95,7 +117,7 @@ send() {
             sent=$((sent + 1))
         else
             failed=$((failed + 1))
-            echo "luxafor-light: cannot write to $DEV/$name (permission denied? replug the light)" >&2
+            echo "luxafor-light: $(tf 'cannot write to %s (permission denied? replug the light)' "$DEV/$name")" >&2
         fi
     done <<< "$lights"
     [ "$sent" -gt 0 ] || exit 1
@@ -119,7 +141,7 @@ case "${1:-}" in
     off)
         send 1 255 0 0 0 0 0 0 ;;
     *)
-        rgb="$(parse_color "$1")" || die "unknown color '$1' — use a name (red, orange…) or a hex code (#ff8800)" 2
+        rgb="$(parse_color "$1")" || die "$(tf "unknown color '%s' — use a name (red, orange…) or a hex code (#ff8800)" "$1")" 2
         b="${LUXAFOR_BRIGHTNESS:-100}"
         if [[ "$b" =~ ^[0-9]+$ ]] && [ "$b" -ge 1 ] && [ "$b" -lt 100 ]; then
             read -r r g bl <<< "$rgb"

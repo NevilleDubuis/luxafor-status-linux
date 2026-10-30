@@ -1,0 +1,343 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the luxafor-status package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: luxafor-status\n"
+"Report-Msgid-Bugs-To: https://github.com/NevilleDubuis/luxafor-status-linux/"
+"issues\n"
+"POT-Creation-Date: 2026-10-30 14:03+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: bin/luxafor-panel:109 bin/luxafor-tray:273
+#, python-brace-format
+msgid "{minutes} min"
+msgstr ""
+
+#: bin/luxafor-panel:112 bin/luxafor-tray:276
+#, python-brace-format
+msgid "{hours} h"
+msgstr ""
+
+#: bin/luxafor-panel:113 bin/luxafor-tray:277
+#, python-brace-format
+msgid "{hours} h {minutes:02d}"
+msgstr ""
+
+#: bin/luxafor-panel:237 bin/luxafor-panel:354
+msgid "Status"
+msgstr ""
+
+#: bin/luxafor-panel:249
+msgid "Settings"
+msgstr ""
+
+#: bin/luxafor-panel:269 bin/luxafor-tray:479
+msgid "Cancel timer"
+msgstr ""
+
+#: bin/luxafor-panel:277
+msgid "1 · DURATION"
+msgstr ""
+
+#: bin/luxafor-panel:285
+msgid "Custom duration"
+msgstr ""
+
+#: bin/luxafor-panel:293 bin/luxafor-panel:602
+msgid "min"
+msgstr ""
+
+#: bin/luxafor-panel:307
+msgid "2 · STATUS"
+msgstr ""
+
+#: bin/luxafor-panel:333
+msgid "Pick a duration, then a status · Esc to close"
+msgstr ""
+
+#: bin/luxafor-panel:384
+#, python-brace-format
+msgid "until {time} · {left} left, then {status}"
+msgstr ""
+
+#: bin/luxafor-panel:390
+msgid "No timer"
+msgstr ""
+
+#: bin/luxafor-panel:445
+msgid "Don't change"
+msgstr ""
+
+#: bin/luxafor-panel:446
+msgid "Light off"
+msgstr ""
+
+#: bin/luxafor-panel:448
+msgid "Follow the desktop"
+msgstr ""
+
+#: bin/luxafor-panel:448
+msgid "Light"
+msgstr ""
+
+#: bin/luxafor-panel:448
+msgid "Dark"
+msgstr ""
+
+#: bin/luxafor-panel:570
+#, python-brace-format
+msgid "Color of “{status}”"
+msgstr ""
+
+#: bin/luxafor-panel:577
+msgid "Move up"
+msgstr ""
+
+#: bin/luxafor-panel:578
+msgid "Move down"
+msgstr ""
+
+#: bin/luxafor-panel:579 bin/luxafor-panel:603
+msgid "Delete"
+msgstr ""
+
+#: bin/luxafor-panel:600
+msgid "for"
+msgstr ""
+
+#: bin/luxafor-panel:617
+msgid "STATUSES"
+msgstr ""
+
+#: bin/luxafor-panel:620
+msgid "Add status"
+msgstr ""
+
+#: bin/luxafor-panel:641
+msgid "After a timer"
+msgstr ""
+
+#: bin/luxafor-panel:641
+msgid "Status to go back to when a timer ends"
+msgstr ""
+
+#: bin/luxafor-panel:642
+msgid "During calls"
+msgstr ""
+
+#: bin/luxafor-panel:642
+msgid "Status used automatically while you are in a call"
+msgstr ""
+
+#: bin/luxafor-panel:643
+msgid "Screen locked"
+msgstr ""
+
+#: bin/luxafor-panel:644
+msgid ""
+"Status while the screen is locked; the previous one comes back when you "
+"unlock"
+msgstr ""
+
+#: bin/luxafor-panel:645
+msgid "Brightness"
+msgstr ""
+
+#: bin/luxafor-panel:645
+msgid "Brightness of the light"
+msgstr ""
+
+#: bin/luxafor-panel:646
+msgid "Theme"
+msgstr ""
+
+#: bin/luxafor-panel:646
+msgid "Look of this panel"
+msgstr ""
+
+#: bin/luxafor-panel:655
+msgid "BEHAVIOR"
+msgstr ""
+
+#: bin/luxafor-panel:660
+msgid "DO NOT DISTURB"
+msgstr ""
+
+#: bin/luxafor-panel:661
+msgid "Silence desktop notifications while:"
+msgstr ""
+
+#: bin/luxafor-panel:662
+msgid "Optional: you may still want to see incoming call notifications"
+msgstr ""
+
+#: bin/luxafor-panel:672
+msgid "TIMERS IN THE TRAY MENU"
+msgstr ""
+
+#: bin/luxafor-panel:675
+msgid "Add timer"
+msgstr ""
+
+#: bin/luxafor-panel:682
+msgid "Edit the file…"
+msgstr ""
+
+#: bin/luxafor-panel:691
+msgid "Revert"
+msgstr ""
+
+#: bin/luxafor-panel:693
+msgid "Save"
+msgstr ""
+
+#: bin/luxafor-panel:744
+msgid "(no name)"
+msgstr ""
+
+#: bin/luxafor-panel:818
+msgid "Keep at least one status."
+msgstr ""
+
+#: bin/luxafor-panel:857
+msgid "Give every status a name."
+msgstr ""
+
+#: bin/luxafor-panel:889
+#, python-brace-format
+msgid "Could not save: {error}"
+msgstr ""
+
+#: bin/luxafor-panel:896
+msgid "Saved."
+msgstr ""
+
+#: bin/luxafor-tray:441 bin/luxafor-tray:495
+msgid "Off"
+msgstr ""
+
+#: bin/luxafor-tray:447
+#, python-brace-format
+msgid "{status} until {time} ({left} left)"
+msgstr ""
+
+#: bin/luxafor-tray:472
+msgid "Light not connected"
+msgstr ""
+
+#: bin/luxafor-tray:489
+#, python-brace-format
+msgid "{status} for {duration}"
+msgstr ""
+
+#: bin/luxafor-tray:491
+msgid "More…"
+msgstr ""
+
+#: bin/luxafor-tray:498
+msgid "Quit"
+msgstr ""
+
+#: bin/luxafor-tray:529
+#, python-brace-format
+msgid "{status} — light not connected"
+msgstr ""
+
+#: bin/luxafor-tray:607
+#, python-brace-format
+msgid ""
+"Light disconnected — {status} will be shown again when it's plugged back in"
+msgstr ""
+
+#: bin/luxafor-tray:618
+#, python-brace-format
+msgid "Light reconnected — {status}"
+msgstr ""
+
+#: bin/luxafor-toggle:89
+msgid "Available"
+msgstr ""
+
+#: bin/luxafor-toggle:89
+msgid "Busy"
+msgstr ""
+
+#: bin/luxafor-toggle:89
+msgid "On a call"
+msgstr ""
+
+#: bin/luxafor-toggle:261
+msgid "Change the Luxafor light status"
+msgstr ""
+
+#: bin/luxafor-toggle:268
+msgid "Open panel…"
+msgstr ""
+
+#: bin/luxafor-toggle:322
+msgid "%d min"
+msgstr ""
+
+#: bin/luxafor-toggle:324
+msgid "%d h"
+msgstr ""
+
+#: bin/luxafor-toggle:326
+msgid "%d h %02d"
+msgstr ""
+
+#: bin/luxafor-toggle:368
+msgid "Timer ended — %s"
+msgstr ""
+
+#: bin/luxafor-toggle:375
+msgid "No timer."
+msgstr ""
+
+#: bin/luxafor-toggle:380
+msgid "%s until %s (%s left), then %s\\n"
+msgstr ""
+
+#: bin/luxafor-toggle:408
+msgid "%s — light not connected"
+msgstr ""
+
+#: bin/luxafor-toggle:479
+msgid "Timer cancelled"
+msgstr ""
+
+#: bin/luxafor-toggle:523
+msgid "%s for %s — until %s"
+msgstr ""
+
+#: bin/luxafor-light:112
+msgid "no Luxafor light found — is it plugged in?"
+msgstr ""
+
+#: bin/luxafor-light:120
+msgid "cannot write to %s (permission denied? replug the light)"
+msgstr ""
+
+#: bin/luxafor-light:144
+msgid "unknown color '%s' — use a name (red, orange…) or a hex code (#ff8800)"
+msgstr ""
+
+#: bin/luxafor-callwatch:142
+msgid "pactl not found — install it with: sudo apt install pulseaudio-utils"
+msgstr ""
+
+#: bin/luxafor-callwatch:144
+msgid ""
+"callwatch.conf is no longer read: set the call status and the watched apps "
+"in Luxafor Panel → Settings (call-status, call-apps in statuses.conf)"
+msgstr ""

@@ -29,35 +29,24 @@ A timer set with
 keeps running during a call. If it ends during the call, the light goes to
 the default status when the call ends.
 .SH CONFIGURATION
-The status used during calls is the
-.B call-status
-setting in
+In
 .I ~/.config/luxafor-status/statuses.conf
-(see
+(Luxafor Panel \(-> Settings, or see
 .BR luxafor-toggle (1)),
-.B call
-by default. It is read at each call.
-.PP
-.I ~/.config/luxafor-status/callwatch.conf
-(optional), one
-.IR key " = " value
-per line:
+read at each call:
 .TP
-.B status
-Older place for the call status, used only when
-.I statuses.conf
-has no
-.BR call-status .
+.B call-status
+Status used during calls (default:
+.BR call );
+.B none
+turns call detection off.
 .TP
-.B apps
+.B call-apps
 Space-separated names matched against the application name and binary
 (default: common web browsers).
-.TP
-.B enabled
-.B no
-turns call detection off.
 .PP
-Restart the watcher (or log out and back in) after changing the file.
+.I ~/.config/luxafor-status/callwatch.conf
+is no longer read since 1.0.
 .SH SEE ALSO
 .BR luxafor-toggle (1),
 .BR luxafor-tray (1),

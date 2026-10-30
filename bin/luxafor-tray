@@ -19,6 +19,27 @@ gi.require_version("AyatanaAppIndicator3", "0.1")
 from gi.repository import AyatanaAppIndicator3 as AI  # noqa: E402
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
+# --- translations ------------------------------------------------------------------
+
+def _translation():
+    """Messages in the user's language (gettext domain luxafor-status)."""
+    import gettext
+
+    home = os.path.expanduser("~")
+    dirs = [
+        os.environ.get("LUXAFOR_LOCALEDIR"),
+        f"{os.environ.get('XDG_DATA_HOME', home + '/.local/share')}/locale",
+        "/usr/local/share/locale",
+        "/usr/share/locale",
+    ]
+    for d in dirs:
+        if d and gettext.find("luxafor-status", d):
+            return gettext.translation("luxafor-status", d)
+    return gettext.NullTranslations()
+
+
+_ = _translation().gettext
+
 HOME = os.path.expanduser("~")
 DATA_HOME = os.environ.get("XDG_DATA_HOME", f"{HOME}/.local/share")
 CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME", f"{HOME}/.config")
@@ -120,7 +141,10 @@ def load_statuses():
                 statuses.append((sid, color, label))
     except OSError:
         pass
-    return statuses or FALLBACK
+    if config_path() != CONF:
+        # Shipped defaults (no statuses of the user's own yet): translated.
+        statuses = [(sid, color, _(label)) for sid, color, label in statuses]
+    return statuses or [(sid, color, _(label)) for sid, color, label in FALLBACK]
 
 
 def setting(key):
@@ -246,9 +270,11 @@ def read_timer():
 
 def human_minutes(minutes):
     if minutes < 60:
-        return f"{minutes} min"
+        return _("{minutes} min").format(minutes=minutes)
     hours, rest = divmod(minutes, 60)
-    return f"{hours} h" if rest == 0 else f"{hours} h {rest:02d}"
+    if rest == 0:
+        return _("{hours} h").format(hours=hours)
+    return _("{hours} h {minutes:02d}").format(hours=hours, minutes=rest)
 
 
 DND_MARK = f"{CACHE_HOME}/luxafor-dnd"
@@ -412,13 +438,15 @@ class Tray:
         self.last_state = None  # force the icon to be set again
 
     def label_of(self, sid):
-        return next((l for s, _c, l in self.statuses if s == sid), "Off" if sid == "off" else sid)
+        return next((l for s, _c, l in self.statuses if s == sid), _("Off") if sid == "off" else sid)
 
     def timer_line(self):
         end, status = self.timer
         left = max(0, round((end - time.time()) / 60 + 0.49))
         until = time.strftime("%H:%M", time.localtime(end))
-        return f"⏱ {self.label_of(status)} until {until} ({human_minutes(left)} left)", left
+        text = _("{status} until {time} ({left} left)").format(
+            status=self.label_of(status), time=until, left=human_minutes(left))
+        return f"⏱ {text}", left
 
     def build_menu(self):
         # Drop the middle-click target first: it belongs to the old menu,
@@ -441,14 +469,14 @@ class Tray:
 
         # Light unplugged
         if self.connected is False:
-            add("⚠ Light not connected", enabled=False)
+            add("⚠ " + _("Light not connected"), enabled=False)
             separator()
 
         # Running timer
         self.timer_item = None
         if self.timer:
             self.timer_item = add(self.timer_line()[0], enabled=False)
-            add("Cancel timer", ["--cancel-timer"])
+            add(_("Cancel timer"), ["--cancel-timer"])
             separator()
 
         # Statuses, in one click
@@ -458,15 +486,16 @@ class Tray:
 
         # Timers in one click; "More…": any duration, and the settings
         for sid, minutes in self.shortcuts:
-            add(f"{self.label_of(sid)} for {human_minutes(minutes)}", [sid, "--for", str(minutes)])
-        more = add("More…", action=lambda: spawn(PANEL))
+            add(_("{status} for {duration}").format(status=self.label_of(sid), duration=human_minutes(minutes)),
+                [sid, "--for", str(minutes)])
+        more = add(_("More…"), action=lambda: spawn(PANEL))
         separator()
 
         # Off isn't a status: the light is just off
-        add("Off", ["off"])
+        add(_("Off"), ["off"])
         separator()
 
-        add("Quit", action=Gtk.main_quit)
+        add(_("Quit"), action=Gtk.main_quit)
         menu.show_all()
         self.ind.set_menu(menu)
         # Middle-click on the icon opens the panel. Set after set_menu: the
@@ -495,7 +524,9 @@ class Tray:
         shown = (state, self.connected)
         if shown != self.last_state:
             if self.connected is False:
-                self.ind.set_icon_full(self.away_icons[state], f"{self.label_of(state)} — light not connected")
+                self.ind.set_icon_full(
+                    self.away_icons[state],
+                    _("{status} — light not connected").format(status=self.label_of(state)))
             else:
                 self.ind.set_icon_full(self.icons[state], self.label_of(state))
             self.last_state = shown
@@ -573,7 +604,8 @@ class Tray:
                 self.build_menu()
                 if was_connected:
                     state = self.label_of(read_state())
-                    notify(f"Light disconnected — {state} will be shown again when it's plugged back in")
+                    notify(_("Light disconnected — {status} will be shown again when it's plugged back in")
+                           .format(status=state))
         if self.apply_tries:
             self.apply_tries -= 1
             done = subprocess.run(
@@ -583,7 +615,7 @@ class Tray:
             if done:
                 self.apply_tries = 0
                 if self.announce:
-                    notify(f"Light reconnected — {self.label_of(read_state())}")
+                    notify(_("Light reconnected — {status}").format(status=self.label_of(read_state())))
                     self.announce = False
             elif not self.apply_tries:
                 log("could not show the status on the light after it was plugged in")

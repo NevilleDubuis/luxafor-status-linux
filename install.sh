@@ -37,7 +37,7 @@ fi
 # 1. System dependencies ------------------------------------------------------
 if [ "$DO_DEPS" -eq 1 ]; then
     step "System dependencies"
-    PKGS=(python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 libnotify-bin pulseaudio-utils)
+    PKGS=(python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 libnotify-bin pulseaudio-utils gettext-base)
     MISSING=()
     for p in "${PKGS[@]}"; do
         dpkg -s "$p" >/dev/null 2>&1 || MISSING+=("$p")
@@ -73,6 +73,11 @@ install -m 0644 "$SRC/share/icons/luxafor-status.svg" "$APPICONDIR/luxafor-statu
 # Budgie's tray show it instead of the status color (see bin/luxafor-tray).
 rm -f "$APPICONDIR/luxafor.svg" "$DATA_HOME"/icons/luxafor-tray-*.svg
 install -m 0644 "$SRC/share/statuses.conf" "$SHAREDIR/statuses.conf"
+if command -v msgfmt >/dev/null 2>&1; then
+    "$SRC/po/build.sh" "$DATA_HOME/locale"
+else
+    warn "msgfmt not found (package gettext): the interface stays in English"
+fi
 gtk-update-icon-cache -q "$DATA_HOME/icons/hicolor" >/dev/null 2>&1 || true
 ok "scripts in $BINDIR"
 

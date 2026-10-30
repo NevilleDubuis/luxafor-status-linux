@@ -1,7 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Luxafor Call Detection
+Name[fr]=Détection d’appel Luxafor
 Comment=Switches the Luxafor light to a status while you are in a call
+Comment[fr]=Passe la lampe Luxafor à un statut pendant les appels
 Exec=@BINDIR@/luxafor-callwatch
 Icon=luxafor-status
 Terminal=false

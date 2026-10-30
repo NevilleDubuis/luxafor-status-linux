@@ -6,6 +6,7 @@
 They use a fake light and isolated config dirs, like tests/run.sh.
 """
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -38,6 +39,7 @@ os.environ.update(
     LUXAFOR_SYSFS=f"{TMP}/sys",
     LUXAFOR_DEV=f"{TMP}/dev",
     GSETTINGS_BACKEND="memory",  # do-not-disturb tests never touch real settings
+    LC_ALL="C.UTF-8", LANGUAGE="en",  # English messages; translations tested at the end
 )
 os.makedirs(os.environ["HOME"])
 TOGGLE = f"{ROOT}/bin/luxafor-toggle"
@@ -505,6 +507,25 @@ try:
 except Exception as e:  # AppIndicator needs a D-Bus session
     FAIL += 1
     print(f"  \033[31m✗\033[0m tray could not start: {e}")
+
+print("translations")
+if shutil.which("msgfmt"):
+    subprocess.run([f"{ROOT}/po/build.sh", f"{TMP}/locale"], check=True, capture_output=True)
+    probe = (
+        "import sys\n"
+        "for name in ('luxafor-panel', 'luxafor-tray'):\n"
+        "    src = open(sys.argv[1] + '/bin/' + name).read().replace('if __name__ == \"__main__\":', 'if False:')\n"
+        "    ns = {'__file__': sys.argv[1] + '/bin/' + name, '__name__': 'x'}\n"
+        "    exec(compile(src, name, 'exec'), ns)\n"
+        "    print(ns['_']('Settings'), '|', ns['_']('More…'), '|', ns['human_minutes'](90))\n"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", probe, ROOT], capture_output=True, text=True,
+        env=dict(os.environ, LUXAFOR_LOCALEDIR=f"{TMP}/locale", LANGUAGE="fr", LC_ALL="", LANG="fr_CH.UTF-8"),
+    ).stdout.splitlines()
+    eq("panel and tray in French", out, ["Réglages | Plus… | 1 h 30", "Réglages | Plus… | 1 h 30"])
+else:
+    print("  (skipped: needs msgfmt)")
 
 print(f"\n{PASS} passed, {FAIL} failed")
 subprocess.run(["rm", "-rf", TMP])

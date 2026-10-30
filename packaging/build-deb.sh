@@ -47,6 +47,8 @@ install -m 0755 "$ROOT/bin/luxafor-light" "$ROOT/bin/luxafor-toggle" \
     "$ROOT/bin/luxafor-tray" "$ROOT/bin/luxafor-callwatch" "$ROOT/bin/luxafor-panel" \
     "$STAGE/usr/bin/"
 install -m 0644 "$ROOT/share/statuses.conf" "$STAGE/usr/share/$PKG/statuses.conf"
+"$ROOT/po/build.sh" "$STAGE/usr/share/locale"   # translations (needs msgfmt)
+find "$STAGE/usr/share/locale" -type d -exec chmod 0755 {} + -o -type f -exec chmod 0644 {} +
 install -m 0644 "$ROOT/share/icons/luxafor-status.svg" \
     "$STAGE/usr/share/icons/hicolor/scalable/apps/luxafor-status.svg"
 install -m 0644 "$ROOT/udev/70-luxafor-status.rules" "$STAGE/usr/lib/udev/rules.d/"
@@ -107,7 +109,7 @@ Version: $VERSION
 Architecture: all
 Maintainer: $MAINTAINER
 Installed-Size: $(du -sk --exclude=DEBIAN "$STAGE" | cut -f1)
-Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1, pulseaudio-utils
+Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1, pulseaudio-utils, gettext-base
 Recommends: libnotify-bin, xdg-utils
 Section: utils
 Priority: optional

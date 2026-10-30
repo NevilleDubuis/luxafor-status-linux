@@ -18,6 +18,28 @@
 #   call-apps = firefox chrome chromium …   # names matched against the app
 set -u
 
+# --- translations (gettext domain luxafor-status) -----------------------------
+TEXTDOMAIN=luxafor-status
+TEXTDOMAINDIR=""
+for _dir in "${LUXAFOR_LOCALEDIR:-}" "${XDG_DATA_HOME:-$HOME/.local/share}/locale" \
+            /usr/local/share/locale /usr/share/locale; do
+    if [ -n "$_dir" ] && compgen -G "$_dir/*/LC_MESSAGES/$TEXTDOMAIN.mo" >/dev/null; then
+        TEXTDOMAINDIR="$_dir"; break
+    fi
+done
+export TEXTDOMAIN TEXTDOMAINDIR
+# t "text": translated text. tf "format" args…: translated printf format.
+t() {
+    if [ -n "$TEXTDOMAINDIR" ] && command -v gettext >/dev/null 2>&1; then gettext "$1"
+    else printf '%s' "$1"; fi
+}
+tf() {
+    local format
+    format="$(t "$1")"; shift
+    # shellcheck disable=SC2059  # the format is the (translated) message
+    printf -- "$format" "$@"
+}
+
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 OLD_CONF="$CONFIG_HOME/luxafor-status/callwatch.conf"
 TIMER="${XDG_CACHE_HOME:-$HOME/.cache}/luxafor-timer"
@@ -117,9 +139,9 @@ echo $$ > "$PIDFILE"
 trap 'rm -f "$PIDFILE"' EXIT
 trap 'exit 0' TERM INT HUP
 
-command -v pactl >/dev/null 2>&1 || { alert "pactl not found — install it with: sudo apt install pulseaudio-utils"; exit 1; }
+command -v pactl >/dev/null 2>&1 || { alert "$(t "pactl not found — install it with: sudo apt install pulseaudio-utils")"; exit 1; }
 if [ -f "$OLD_CONF" ]; then
-    alert "callwatch.conf is no longer read: set the call status and the watched apps in Luxafor Panel → Settings (call-status, call-apps in statuses.conf)"
+    alert "$(t "callwatch.conf is no longer read: set the call status and the watched apps in Luxafor Panel → Settings (call-status, call-apps in statuses.conf)")"
 fi
 
 ACTIVE=0      # 1 while we have switched the light to the call status

@@ -22,6 +22,9 @@ fake_hidraw hidraw0 0003:0000046D:0000C52B "Logitech USB Receiver"
 fake_hidraw hidraw1 0003:000004D8:0000F372 "Microchip Technology Inc. LUXAFOR ORB"
 fake_hidraw hidraw2 0003:000004D8:0000F372 "Microchip Technology Inc. LUXAFOR FLAG"
 
+# Messages in English, whatever the machine's language (translations are
+# tested at the end).
+export LC_ALL=C.UTF-8 LANGUAGE=en
 export LUXAFOR_SYSFS="$TMP/sys" LUXAFOR_DEV="$TMP/dev"
 export XDG_RUNTIME_DIR="$TMP/run"
 export HOME="$TMP/home" XDG_DATA_HOME="$TMP/data" XDG_CONFIG_HOME="$TMP/config" \
@@ -266,6 +269,24 @@ eq "timer ends during a call → call status kept" "$("$TOGGLE" --current)" tel
 eq "call ends after the timer → default status" "$("$TOGGLE" --current)" dispo
 stop_watch
 "$TOGGLE" --cancel-timer
+
+echo "translations"
+FR_LOCALE="$(locale -a 2>/dev/null | grep -iE '^fr_[A-Z]{2}\.utf-?8$' | head -1)"
+if command -v msgfmt >/dev/null 2>&1 && command -v gettext >/dev/null 2>&1 && [ -n "$FR_LOCALE" ]; then
+    "$ROOT/po/build.sh" "$TMP/locale"
+    fr() { LUXAFOR_LOCALEDIR="$TMP/locale" LC_ALL="$FR_LOCALE" LANGUAGE=fr "$@"; }
+    rm -f "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"   # back to the shipped statuses
+    eq "shipped status names translated" "$(fr "$TOGGLE" --list | awk '{print $3, $4}' | paste -sd,)" "Disponible ,Occupé ,En appel,Éteint "
+    "$TOGGLE" busy --for 90 >/dev/null 2>&1
+    eq "timer in French" "$(fr "$TOGGLE" --timer | sed 's/[0-9][0-9]:[0-9][0-9]/HH:MM/')" "Occupé jusqu’à HH:MM (encore 1 h 30), puis Disponible"
+    "$TOGGLE" --cancel-timer
+    eq "driver messages in French" "$(LUXAFOR_IDS=dead:beef fr "$LIGHT" red 2>&1)" "luxafor-light: aucune lampe Luxafor trouvée — est-elle branchée ?"
+    mkdir -p "$XDG_CONFIG_HOME/luxafor-status"
+    printf 'busy | red | Busy\n' > "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+    eq "the user's own status names are never translated" "$(fr "$TOGGLE" --list | head -1 | awk '{print $3}')" "Busy"
+else
+    echo "  (skipped: needs msgfmt, gettext and a French locale)"
+fi
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

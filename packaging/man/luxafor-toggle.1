@@ -100,7 +100,30 @@ or the first status).
 Status used during calls by
 .BR luxafor-callwatch (1)
 (default:
-.BR call ).
+.BR call );
+.B none
+turns call detection off.
+.TP
+.B call-apps
+Applications that count as "in a call" when they use the microphone,
+space-separated, matched against the application name (default: common web
+browsers).
+.TP
+.B lock-status
+Status while the screen is locked (see
+.BR luxafor-tray (1)):
+a status,
+.B off
+(default), or
+.B none
+to leave the status alone.
+.TP
+.B dnd-statuses
+Statuses during which desktop notifications are silenced, comma-separated
+(default: none).
+.TP
+.B brightness
+Brightness of the light in percent, 5 to 100 (default: 100).
 .TP
 .B timer-shortcuts
 Timers offered in one click in the tray menu, as comma-separated
