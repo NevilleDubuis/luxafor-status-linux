@@ -123,6 +123,12 @@ def load_statuses():
     return statuses or FALLBACK
 
 
+def setting(key):
+    return subprocess.run(
+        [TOGGLE, "--setting", key], capture_output=True, text=True, check=False
+    ).stdout.strip()
+
+
 def load_shortcuts():
     """[(status id, minutes)] for the tray menu — see timer-shortcuts."""
     shortcuts = []
@@ -245,6 +251,114 @@ def human_minutes(minutes):
     return f"{hours} h" if rest == 0 else f"{hours} h {rest:02d}"
 
 
+DND_MARK = f"{CACHE_HOME}/luxafor-dnd"
+
+
+class DesktopDnd:
+    """The desktop's "do not disturb" switch, wherever this desktop keeps it.
+
+    Budgie and other desktops keep a boolean "…do-not-disturb…" key in their
+    own GSettings schema; GNOME has org.gnome.desktop.notifications
+    show-banners (false = do not disturb). Found once, at startup.
+    """
+
+    CANDIDATES = (
+        "budgie", "raven", "cinnamon", "mate", "xfce", "pantheon", "notifications",
+    )
+
+    def __init__(self):
+        self.settings, self.key, self.inverted = None, None, False
+        source = Gio.SettingsSchemaSource.get_default()
+        if not source:
+            return
+        schemas = source.list_schemas(True)[0]  # non-relocatable only
+        for sid in sorted(schemas):
+            if not any(c in sid.lower() for c in self.CANDIDATES):
+                continue
+            schema = source.lookup(sid, True)
+            for key in schema.list_keys():
+                if ("disturb" in key or key == "dnd") and \
+                        schema.get_key(key).get_value_type().dup_string() == "b":
+                    self.settings, self.key = Gio.Settings.new(sid), key
+                    return
+        schema = source.lookup("org.gnome.desktop.notifications", True)
+        if schema and schema.has_key("show-banners"):
+            self.settings = Gio.Settings.new("org.gnome.desktop.notifications")
+            self.key, self.inverted = "show-banners", True
+
+    @property
+    def available(self):
+        return self.settings is not None
+
+    def describe(self):
+        return f"{self.settings.props.schema_id} {self.key}" if self.available else "none"
+
+    def get(self):
+        value = self.settings.get_boolean(self.key)
+        return not value if self.inverted else value
+
+    def set(self, on):
+        self.settings.set_boolean(self.key, not on if self.inverted else on)
+        Gio.Settings.sync()
+
+
+class ScreenLock:
+    """Calls on_change(locked) when the screen is locked or unlocked.
+
+    Listens to the screensaver interfaces of the usual desktops (Budgie and
+    GNOME: org.gnome.ScreenSaver; KDE…: org.freedesktop.ScreenSaver;
+    Cinnamon, MATE) and to logind's LockedHint, whichever speaks first.
+    """
+
+    INTERFACES = (
+        "org.gnome.ScreenSaver", "org.freedesktop.ScreenSaver",
+        "org.cinnamon.ScreenSaver", "org.mate.ScreenSaver",
+    )
+
+    def __init__(self, on_change):
+        self.on_change = on_change
+        self.locked = False
+        try:
+            session = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+            for iface in self.INTERFACES:
+                session.signal_subscribe(
+                    None, iface, "ActiveChanged", None, None,
+                    Gio.DBusSignalFlags.NONE, self.on_screensaver,
+                )
+        except GLib.Error as e:
+            log(f"screen lock: no session bus ({e.message})")
+        try:
+            system = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+            path = system.call_sync(
+                "org.freedesktop.login1", "/org/freedesktop/login1",
+                "org.freedesktop.login1.Manager", "GetSessionByPID",
+                GLib.Variant("(u)", (os.getpid(),)), GLib.VariantType("(o)"),
+                Gio.DBusCallFlags.NONE, 2000, None,
+            ).unpack()[0]
+            system.signal_subscribe(
+                "org.freedesktop.login1", "org.freedesktop.DBus.Properties",
+                "PropertiesChanged", path, None, Gio.DBusSignalFlags.NONE, self.on_logind,
+            )
+        except GLib.Error:
+            pass  # no logind session (tests, containers): screensaver signals only
+
+    def on_screensaver(self, _conn, _sender, _path, _iface, _signal, params):
+        self.set(bool(params.unpack()[0]))
+
+    def on_logind(self, _conn, _sender, _path, _iface, _signal, params):
+        iface, changed, _invalidated = params.unpack()
+        if iface == "org.freedesktop.login1.Session" and "LockedHint" in changed:
+            self.set(bool(changed["LockedHint"]))
+
+    def set(self, locked):
+        if locked != self.locked:
+            self.locked = locked
+            try:
+                self.on_change(locked)
+            except Exception:
+                log("error on screen lock change:\n" + traceback.format_exc())
+
+
 class Tray:
     def __init__(self):
         self.ind = AI.Indicator.new(
@@ -267,6 +381,14 @@ class Tray:
         self.missing_checks = 0
         self.apply_tries = 0
         self.announce = False    # say "reconnected" once the status is back
+        # Screen lock
+        self.lock_status = "off"
+        self.lock = None         # (status before, timer end) while locked
+        self.screen = ScreenLock(self.on_lock)
+        # Do not disturb
+        self.dnd_statuses = set()
+        self.dnd = DesktopDnd()
+        self.dnd_state = None
         # Restart a timer that was running before logout, or end it if expired.
         spawn(TOGGLE, "--resume-timer")
         self.tick()
@@ -282,6 +404,9 @@ class Tray:
         )
         self.statuses = load_statuses()
         self.shortcuts = load_shortcuts()
+        self.lock_status = setting("lock-status") or "off"
+        self.dnd_statuses = set(setting("dnd-statuses").split())
+        self.dnd_state = None  # apply the DND setting again
         self.icons, self.away_icons = write_tray_icons(self.statuses)
         self.build_menu()
         self.last_state = None  # force the icon to be set again
@@ -366,6 +491,7 @@ class Tray:
         state = read_state()
         if state not in self.icons:
             state = "off"
+        self.update_dnd(state)
         shown = (state, self.connected)
         if shown != self.last_state:
             if self.connected is False:
@@ -375,6 +501,58 @@ class Tray:
             self.last_state = shown
         self.update_timer()
         reap_children()
+
+    # --- screen lock -----------------------------------------------------------
+
+    def on_lock(self, locked):
+        """Locked: lock-status (off by default). Unlocked: back to the status
+        from before, unless it was changed meanwhile (a call, by hand…)."""
+        if self.lock_status == "none":
+            return
+        if locked:
+            before = read_state()
+            timer = read_timer()
+            self.lock = (before, timer[0] if timer else None)
+            if before != self.lock_status:
+                # --keep-timer: locking the screen doesn't cancel a timer.
+                spawn(TOGGLE, self.lock_status, "--keep-timer")
+            return
+        if not self.lock:
+            return
+        before, timer_end = self.lock
+        self.lock = None
+        if read_state() != self.lock_status or before == self.lock_status:
+            return
+        back = before
+        if timer_end and not read_timer() and time.time() >= timer_end:
+            back = setting("default-status")  # the timer ended while locked
+        spawn(TOGGLE, back, "--keep-timer")
+
+    # --- do not disturb ----------------------------------------------------------
+
+    def update_dnd(self, state):
+        """Silences desktop notifications while the status is one of
+        dnd-statuses; puts the previous setting back afterwards."""
+        want = state in self.dnd_statuses
+        if want == self.dnd_state or not self.dnd.available:
+            return
+        self.dnd_state = want
+        if want and not os.path.exists(DND_MARK):
+            # Remember the user's own setting (survives a tray restart).
+            with open(DND_MARK, "w") as f:
+                f.write("1\n" if self.dnd.get() else "0\n")
+            self.dnd.set(True)
+        elif not want and os.path.exists(DND_MARK):
+            with open(DND_MARK) as f:
+                previous = f.read().strip() == "1"
+            os.remove(DND_MARK)
+            self.dnd.set(previous)
+
+    def restore_dnd(self):
+        """On quit: never leave notifications silenced behind."""
+        if self.dnd.available and os.path.exists(DND_MARK):
+            self.dnd_state = None
+            self.update_dnd(None)
 
     def update_light(self):
         """Notices the light being unplugged (laptop leaving its dock) and
@@ -458,6 +636,8 @@ def main():
         lost,
     )
     Gtk.main()
+    if state["tray"]:
+        state["tray"].restore_dnd()
 
 
 if __name__ == "__main__":

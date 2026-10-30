@@ -37,6 +37,7 @@ os.environ.update(
     XDG_DATA_HOME=f"{TMP}/data",
     LUXAFOR_SYSFS=f"{TMP}/sys",
     LUXAFOR_DEV=f"{TMP}/dev",
+    GSETTINGS_BACKEND="memory",  # do-not-disturb tests never touch real settings
 )
 os.makedirs(os.environ["HOME"])
 TOGGLE = f"{ROOT}/bin/luxafor-toggle"
@@ -412,6 +413,74 @@ try:
     eq("…status shown on the light again", open(f"{TMP}/dev/hidraw0", "rb").read().hex(), "0001ffffff00000000")  # call = yellow
     eq("…normal icon", tray.ind.get_icon().startswith("lxftray-call-"), True)
     eq("…warning gone", labels()[0] != "⚠ Light not connected", True)
+
+    # Screen lock (Budgie and GNOME: org.gnome.ScreenSaver ActiveChanged)
+    Gio = panel_ns["Gio"]
+    conn = Gio.bus_get_sync(Gio.BusType.SESSION)
+
+    def screensaver(active):
+        conn.emit_signal(None, "/org/gnome/ScreenSaver", "org.gnome.ScreenSaver",
+                         "ActiveChanged", GLib.Variant("(b)", (active,)))
+        pump(1.2)
+
+    CONF_PATH = f"{TMP}/config/luxafor-status/statuses.conf"
+
+    def add_setting(line):
+        with open(CONF_PATH, "a") as f:
+            f.write(line + "\n")
+        pump(1.5)  # the tray reloads the file when it changes
+
+    toggle("busy")
+    pump(1.2)
+    screensaver(True)
+    eq("screen locked → light off (default lock-status)", toggle("--current"), "off")
+    screensaver(False)
+    eq("unlocked → previous status back", toggle("--current"), "busy")
+    toggle("busy", "--for", "30")
+    screensaver(True)
+    eq("locking keeps a running timer", "30 min left" in toggle("--timer"), True)
+    screensaver(False)
+    eq("…and the timed status comes back", toggle("--current"), "busy")
+    toggle("--cancel-timer")
+    screensaver(True)
+    toggle("call")
+    screensaver(False)
+    eq("status changed while locked is kept", toggle("--current"), "call")
+    add_setting("lock-status = focus")
+    screensaver(True)
+    eq("lock-status = focus", toggle("--current"), "focus")
+    screensaver(False)
+    eq("…back after unlocking", toggle("--current"), "call")
+    add_setting("lock-status = none")
+    screensaver(True)
+    eq("lock-status = none → status left alone", toggle("--current"), "call")
+    screensaver(False)
+
+    # Do not disturb
+    dnd = tray.dnd
+    eq("do-not-disturb switch found", dnd.available, True)
+    toggle("busy")
+    pump(1.2)
+    eq("no dnd-statuses → notifications left alone", dnd.get(), False)
+    add_setting("dnd-statuses = busy, focus")
+    eq("busy is a dnd status → notifications silenced", dnd.get(), True)
+    toggle("focus")
+    pump(1.2)
+    eq("…still while switching to another dnd status", dnd.get(), True)
+    toggle("available")
+    pump(1.2)
+    eq("other status → notifications back", dnd.get(), False)
+    dnd.set(True)  # the user had silenced notifications themselves
+    toggle("busy")
+    pump(1.2)
+    toggle("available")
+    pump(1.2)
+    eq("…and the user's own setting is put back", dnd.get(), True)
+    dnd.set(False)
+    toggle("busy")
+    pump(1.2)
+    tray.restore_dnd()
+    eq("quitting the tray never leaves notifications silenced", dnd.get(), False)
     toggle("--cancel-timer")
 except Exception as e:  # AppIndicator needs a D-Bus session
     FAIL += 1
