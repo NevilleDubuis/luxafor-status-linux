@@ -1,8 +1,11 @@
 #!/usr/bin/python3
 """luxafor-panel — a small window to pick a status, optionally for a while.
 
-Choose a duration (∞ = no timer), then click a status: it is applied and the
-panel closes. Keyboard: 1–9 pick a status, Esc closes.
+Status tab: choose a duration (∞ = no timer), then click a status: it is
+applied and the panel closes. Keyboard: 1–9 pick a status, Esc closes.
+
+Settings tab: statuses (color, name, order), the status after a timer and
+during calls, the timers of the tray menu, and the theme.
 
 Everything goes through luxafor-toggle, so the panel never disagrees with
 the tray icon, the launcher or the command line.
@@ -45,6 +48,7 @@ CSS = b"""
 .lx-status { padding: 6px 10px; }
 .lx-status.lx-current { box-shadow: inset 0 0 0 2px @theme_selected_bg_color; font-weight: bold; }
 .lx-hint { font-size: smaller; opacity: 0.55; }
+.lx-switcher { margin-bottom: 6px; }
 """
 
 
@@ -104,11 +108,18 @@ def apply_theme(mode=None):
     """
     mode = mode or toggle_output("--setting", "theme").strip() or "auto"
     settings = Gtk.Settings.get_default()
+    if not hasattr(apply_theme, "desktop"):
+        apply_theme.desktop = (
+            settings.get_property("gtk-theme-name"),
+            settings.get_property("gtk-application-prefer-dark-theme"),
+        )
     if mode in ("light", "dark"):
         settings.set_property("gtk-theme-name", "Adwaita")
         settings.set_property("gtk-application-prefer-dark-theme", mode == "dark")
-    elif system_prefers_dark():
-        settings.set_property("gtk-application-prefer-dark-theme", True)
+    else:
+        name, dark = apply_theme.desktop
+        settings.set_property("gtk-theme-name", name)
+        settings.set_property("gtk-application-prefer-dark-theme", dark or system_prefers_dark())
     return mode
 
 
@@ -188,9 +199,27 @@ class Panel(Gtk.ApplicationWindow):
         self.set_icon_name("luxafor-status")
         self.connect("key-press-event", self.on_key)
 
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        outer.get_style_context().add_class("lx-panel")
+        self.add(outer)
+        self.stack = Gtk.Stack()
+        self.stack.set_hhomogeneous(False)
+        self.stack.set_vhomogeneous(False)
+        self.stack.set_transition_type(Gtk.StackTransitionType.NONE)
+        self.stack.connect("notify::visible-child", lambda *_a: self.resize(1, 1))
+        switcher = Gtk.StackSwitcher(stack=self.stack, halign=Gtk.Align.CENTER)
+        switcher.get_style_context().add_class("lx-switcher")
+        outer.pack_start(switcher, False, False, 0)
+        outer.pack_start(self.stack, True, True, 0)
+        self.stack.add_titled(self.build_status_page(), "status", "Status")
+        self.settings = SettingsPage(on_saved=self.rebuild_status_page)
+        self.stack.add_titled(self.settings, "settings", "Settings")
+
+        self.refresh_header()
+        GLib.timeout_add_seconds(15, self.refresh_header)
+
+    def build_status_page(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        box.get_style_context().add_class("lx-panel")
-        self.add(box)
 
         # Current status and timer
         head = Gtk.Box(spacing=10)
@@ -271,13 +300,28 @@ class Panel(Gtk.ApplicationWindow):
         hint = Gtk.Label(label="Pick a duration, then a status · Esc to close", xalign=0)
         hint.get_style_context().add_class("lx-hint")
         footer.pack_start(hint, True, True, 0)
-        edit = Gtk.LinkButton.new_with_label("", "Edit statuses…")
-        edit.connect("activate-link", self.on_edit)
-        footer.pack_end(edit, False, False, 0)
         box.pack_start(footer, False, False, 4)
+        return box
 
+
+    def focus_status(self):
+        """Opens on the Status tab, keyboard focus on the current status (not
+        in the duration field, where 1–9 would type digits)."""
+        self.stack.set_visible_child_name("status")
+        button = self.status_buttons.get(self.current) or next(iter(self.status_buttons.values()))
+        button.grab_focus()
+
+    def rebuild_status_page(self):
+        """After the settings are saved: statuses may have changed."""
+        self.statuses = load_statuses()
+        old = self.stack.get_child_by_name("status")
+        self.stack.remove(old)
+        old.destroy()
+        page = self.build_status_page()
+        self.stack.add_titled(page, "status", "Status")
+        self.stack.child_set_property(page, "position", 0)
+        page.show_all()
         self.refresh_header()
-        GLib.timeout_add_seconds(15, self.refresh_header)
 
     @staticmethod
     def heading(text):
@@ -337,17 +381,15 @@ class Panel(Gtk.ApplicationWindow):
         self.run(["--cancel-timer"])
         self.close()
 
-    def on_edit(self, _button):
-        self.run(["--edit", "--gui"])
-        self.close()
-        return True  # handled: don't open a URI
-
     def on_key(self, _widget, event):
         if event.keyval == Gdk.KEY_Escape:
             self.close()
             return True
-        if self.spin.has_focus():
-            return False  # typing a custom duration
+        if self.stack.get_visible_child_name() != "status":
+            return False
+        focus = self.get_focus()
+        if isinstance(focus, Gtk.Entry) and focus.has_focus():
+            return False  # typing (custom duration)
         name = Gdk.keyval_name(event.keyval) or ""
         if name.startswith("KP_"):
             name = name[3:]
@@ -357,6 +399,407 @@ class Panel(Gtk.ApplicationWindow):
                 self.on_status(None, self.statuses[n][0])
                 return True
         return False
+
+
+# --- settings -------------------------------------------------------------------
+
+CONF = f"{CONFIG_HOME}/luxafor-status/statuses.conf"
+KNOWN_SETTINGS = ("default-status", "call-status", "timer-shortcuts", "theme")
+MAX_SHORTCUTS = 6
+THEMES = [("auto", "Follow the desktop"), ("light", "Light"), ("dark", "Dark")]
+
+
+def read_settings():
+    """What the settings page edits, as luxafor-toggle sees it."""
+    statuses = [s for s in load_statuses() if s[0] != "off"]
+    ids = [s[0] for s in statuses]
+    shortcuts = []
+    for line in toggle_output("--setting", "timer-shortcuts").splitlines():
+        try:
+            sid, minutes = line.split()
+            shortcuts.append((sid, int(minutes)))
+        except ValueError:
+            pass
+    call = toggle_output("--setting", "call-status").strip()
+    if call not in ids:
+        call = "call" if "call" in ids else (ids[0] if ids else "")
+    return {
+        "statuses": statuses,
+        "default-status": toggle_output("--setting", "default-status").strip(),
+        "call-status": call,
+        "timer-shortcuts": shortcuts,
+        "theme": toggle_output("--setting", "theme").strip() or "auto",
+    }
+
+
+def other_setting_lines(path=CONF):
+    """`key = value` lines the panel doesn't manage, kept as they are."""
+    kept = []
+    try:
+        with open(path, encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#") or "|" in line or "=" not in line:
+                    continue
+                if line.split("=", 1)[0].strip() not in KNOWN_SETTINGS:
+                    kept.append(line)
+    except OSError:
+        pass
+    return kept
+
+
+def make_id(label, taken):
+    """A command-line id from a label: "Focus — ne pas déranger" → "focus-ne-pas-deranger"."""
+    import unicodedata
+
+    text = unicodedata.normalize("NFKD", label).encode("ascii", "ignore").decode().lower()
+    base = "".join(c if c.isalnum() or c in "_-" else "-" for c in text)
+    base = "-".join(p for p in base.split("-") if p)[:24].strip("-") or "status"
+    if base == "off":
+        base = "off-status"
+    sid, n = base, 2
+    while sid in taken:
+        sid, n = f"{base}-{n}", n + 1
+    return sid
+
+
+def write_settings(settings, path=CONF):
+    """Writes statuses.conf (a .bak of the previous file is kept)."""
+    lines = [
+        "# luxafor-status — status configuration",
+        "# Edited with Luxafor Panel → Settings. Hand edits work too:",
+        "# one status per line, \"id | color | label\", then settings as",
+        "# \"key = value\" — see: man luxafor-toggle",
+        "",
+    ]
+    width = max([len(s[0]) for s in settings["statuses"]] + [4])
+    for sid, color, label in settings["statuses"]:
+        lines.append(f"{sid.ljust(width)} | {color.ljust(8)} | {label}")
+    shortcuts = ", ".join(f"{sid} {minutes}" for sid, minutes in settings["timer-shortcuts"])
+    lines += [
+        "",
+        f"default-status = {settings['default-status']}",
+        f"call-status = {settings['call-status']}",
+        f"timer-shortcuts = {shortcuts}",
+        f"theme = {settings['theme']}",
+    ]
+    lines += other_setting_lines(path)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    if os.path.exists(path):
+        shutil.copyfile(path, path + ".bak")
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    os.replace(tmp, path)
+
+
+def rgba(color):
+    value = Gdk.RGBA()
+    if not value.parse(color):
+        value.parse(OFF_COLOR)
+    return value
+
+
+def to_hex(value):
+    return "#{:02x}{:02x}{:02x}".format(
+        round(value.red * 255), round(value.green * 255), round(value.blue * 255)
+    )
+
+
+def icon_button(icon, tooltip, callback):
+    button = Gtk.Button.new_from_icon_name(icon, Gtk.IconSize.BUTTON)
+    button.set_relief(Gtk.ReliefStyle.NONE)
+    button.set_tooltip_text(tooltip)
+    button.connect("clicked", lambda _b: callback())
+    return button
+
+
+class StatusRow(Gtk.Box):
+    """One editable status: color, label, move up/down, delete."""
+
+    def __init__(self, page, sid, color, label):
+        super().__init__(spacing=4)
+        self.page, self.sid, self.original_color = page, sid, color
+        self.color = Gtk.ColorButton.new_with_rgba(rgba(color))
+        self.color.set_title(f"Color of “{label}”")
+        self.color.connect("color-set", lambda _b: page.changed())
+        self.label = Gtk.Entry(text=label)
+        self.label.set_width_chars(22)
+        self.label.connect("changed", lambda _e: page.changed(statuses=True))
+        self.pack_start(self.color, False, False, 0)
+        self.pack_start(self.label, True, True, 0)
+        self.pack_start(icon_button("go-up-symbolic", "Move up", lambda: page.move(self, -1)), False, False, 0)
+        self.pack_start(icon_button("go-down-symbolic", "Move down", lambda: page.move(self, 1)), False, False, 0)
+        self.pack_start(icon_button("user-trash-symbolic", "Delete", lambda: page.remove(self)), False, False, 0)
+
+    def value(self):
+        """(id or None for a new status, color, label)."""
+        chosen = self.color.get_rgba()
+        color = self.original_color if chosen.equal(rgba(self.original_color)) else to_hex(chosen)
+        return self.sid, color, " ".join(self.label.get_text().split())
+
+
+class ShortcutRow(Gtk.Box):
+    """One timer shortcut of the tray menu: status and duration."""
+
+    def __init__(self, page, sid, minutes):
+        super().__init__(spacing=4)
+        self.page = page
+        self.status = Gtk.ComboBoxText()
+        self.status.connect("changed", lambda _c: page.changed())
+        self.minutes = Gtk.SpinButton.new_with_range(1, 1440, 5)
+        self.minutes.set_value(minutes)
+        self.minutes.connect("value-changed", lambda _s: page.changed())
+        self.pack_start(self.status, True, True, 0)
+        self.pack_start(Gtk.Label(label="for"), False, False, 0)
+        self.pack_start(self.minutes, False, False, 0)
+        self.pack_start(Gtk.Label(label="min"), False, False, 0)
+        self.pack_start(icon_button("user-trash-symbolic", "Delete", lambda: page.remove_shortcut(self)), False, False, 0)
+        self.wanted = sid
+
+
+class SettingsPage(Gtk.Box):
+    """Statuses (color, label, order), default and call status, timer
+    shortcuts and theme — saved to statuses.conf."""
+
+    def __init__(self, on_saved=None):
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.on_saved = on_saved
+        self.loading = False
+
+        # Statuses
+        self.pack_start(Panel.heading("STATUSES"), False, False, 0)
+        self.rows_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroller.set_propagate_natural_height(True)
+        scroller.set_max_content_height(240)
+        scroller.add(self.rows_box)
+        self.pack_start(scroller, False, False, 0)
+        add = Gtk.Button(label="Add status")
+        add.set_halign(Gtk.Align.START)
+        add.connect("clicked", lambda _b: self.add_status())
+        self.pack_start(add, False, False, 0)
+
+        # Default and call status, theme
+        grid = Gtk.Grid(column_spacing=10, row_spacing=6)
+        self.default_combo = Gtk.ComboBoxText()
+        self.call_combo = Gtk.ComboBoxText()
+        self.theme_combo = Gtk.ComboBoxText()
+        for value, text in THEMES:
+            self.theme_combo.append(value, text)
+        for combo in (self.default_combo, self.call_combo, self.theme_combo):
+            combo.connect("changed", lambda _c: self.changed())
+        self.theme_combo.connect("changed", self.on_theme)
+        for n, (text, combo, tip) in enumerate([
+            ("After a timer", self.default_combo, "Status to go back to when a timer ends"),
+            ("During calls", self.call_combo, "Status used automatically while you are in a call"),
+            ("Theme", self.theme_combo, "Look of this panel"),
+        ]):
+            label = Gtk.Label(label=text, xalign=0)
+            label.set_tooltip_text(tip)
+            combo.set_tooltip_text(tip)
+            combo.set_hexpand(True)
+            grid.attach(label, 0, n, 1, 1)
+            grid.attach(combo, 1, n, 1, 1)
+        self.pack_start(Gtk.Box(), False, False, 2)
+        self.pack_start(Panel.heading("BEHAVIOR"), False, False, 0)
+        self.pack_start(grid, False, False, 0)
+
+        # Timer shortcuts
+        self.pack_start(Gtk.Box(), False, False, 2)
+        self.pack_start(Panel.heading("TIMERS IN THE TRAY MENU"), False, False, 0)
+        self.shortcuts_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self.pack_start(self.shortcuts_box, False, False, 0)
+        self.add_shortcut_button = Gtk.Button(label="Add timer")
+        self.add_shortcut_button.set_halign(Gtk.Align.START)
+        self.add_shortcut_button.connect("clicked", lambda _b: self.add_shortcut())
+        self.pack_start(self.add_shortcut_button, False, False, 0)
+
+        # Buttons
+        bottom = Gtk.Box(spacing=8)
+        edit = Gtk.LinkButton.new_with_label("", "Edit the file…")
+        edit.set_tooltip_text(CONF)
+        edit.connect("activate-link", self.on_edit_file)
+        bottom.pack_start(edit, False, False, 0)
+        self.message = Gtk.Label(xalign=1)
+        self.message.set_line_wrap(True)
+        self.message.set_max_width_chars(28)
+        self.message.get_style_context().add_class("lx-hint")
+        bottom.pack_start(self.message, True, True, 0)
+        self.revert_button = Gtk.Button(label="Revert")
+        self.revert_button.connect("clicked", lambda _b: self.load())
+        self.save_button = Gtk.Button(label="Save")
+        self.save_button.get_style_context().add_class("suggested-action")
+        self.save_button.connect("clicked", lambda _b: self.save())
+        bottom.pack_end(self.save_button, False, False, 0)
+        bottom.pack_end(self.revert_button, False, False, 0)
+        self.pack_start(Gtk.Separator(), False, False, 4)
+        self.pack_start(bottom, False, False, 0)
+
+        self.load()
+
+    # --- loading ---------------------------------------------------------------
+
+    def load(self):
+        self.loading = True
+        settings = read_settings()
+        for child in self.rows_box.get_children() + self.shortcuts_box.get_children():
+            child.destroy()
+        for sid, color, label in settings["statuses"]:
+            self.rows_box.pack_start(StatusRow(self, sid, color, label), False, False, 0)
+        for sid, minutes in settings["timer-shortcuts"]:
+            self.shortcuts_box.pack_start(ShortcutRow(self, sid, minutes), False, False, 0)
+        self.theme_combo.set_active_id(settings["theme"])
+        self.wanted = {"default": settings["default-status"], "call": settings["call-status"]}
+        self.refresh_choices()
+        self.show_all()
+        self.loading = False
+        self.set_dirty(False)
+        self.message.set_text("")
+
+    # --- editing ---------------------------------------------------------------
+
+    def rows(self):
+        return self.rows_box.get_children()
+
+    def shortcut_rows(self):
+        return self.shortcuts_box.get_children()
+
+    def choices(self):
+        """[(key, label)] for the combo boxes: the id for existing statuses,
+        the row itself (as a string key) for new ones."""
+        return [(row.sid or f"new:{id(row)}", row.value()[2] or "(no name)") for row in self.rows()]
+
+    def refresh_choices(self):
+        """Fills the status combo boxes, keeping what was chosen when possible."""
+        was_loading, self.loading = self.loading, True
+        choices = self.choices()
+        keys = [k for k, _l in choices]
+        combos = [("default", self.default_combo), ("call", self.call_combo)]
+        combos += [(row, row.status) for row in self.shortcut_rows()]
+        for name, combo in combos:
+            current = combo.get_active_id()
+            if current is None:
+                current = self.wanted[name] if isinstance(name, str) else name.wanted
+            combo.remove_all()
+            for key, label in choices:
+                combo.append(key, label)
+            if current in keys:
+                combo.set_active_id(current)
+            elif keys:
+                combo.set_active(0)
+        self.loading = was_loading
+
+    def changed(self, statuses=False):
+        if self.loading:
+            return
+        if statuses:
+            self.refresh_choices()
+        self.set_dirty(True)
+
+    def set_dirty(self, dirty):
+        self.dirty = dirty
+        self.save_button.set_sensitive(dirty)
+        self.revert_button.set_sensitive(dirty)
+        if dirty:
+            self.message.set_text("")
+        self.add_shortcut_button.set_sensitive(len(self.shortcut_rows()) < MAX_SHORTCUTS)
+
+    def add_status(self):
+        row = StatusRow(self, None, "#ffffff", "")
+        self.rows_box.pack_start(row, False, False, 0)
+        row.show_all()
+        row.label.grab_focus()
+        self.changed(statuses=True)
+
+    def move(self, row, step):
+        rows = self.rows()
+        n = rows.index(row) + step
+        if 0 <= n < len(rows):
+            self.rows_box.reorder_child(row, n)
+            self.changed(statuses=True)
+
+    def remove(self, row):
+        if len(self.rows()) <= 1:
+            self.message.set_text("Keep at least one status.")
+            return
+        row.destroy()
+        self.changed(statuses=True)
+
+    def add_shortcut(self):
+        if len(self.shortcut_rows()) >= MAX_SHORTCUTS:
+            return
+        row = ShortcutRow(self, None, 30)
+        self.shortcuts_box.pack_start(row, False, False, 0)
+        self.refresh_choices()
+        row.show_all()
+        self.changed()
+
+    def remove_shortcut(self, row):
+        row.destroy()
+        self.changed()
+
+    def on_theme(self, combo):
+        if not self.loading and combo.get_active_id():
+            apply_theme(combo.get_active_id())
+
+    def on_edit_file(self, _button):
+        subprocess.Popen(
+            [TOGGLE, "--edit", "--gui"], stdin=subprocess.DEVNULL, start_new_session=True
+        )
+        return True
+
+    # --- saving ----------------------------------------------------------------
+
+    def collect(self):
+        """The settings to write, or an error message."""
+        for row in self.rows():
+            row.label.get_style_context().remove_class("error")
+        empty = [row for row in self.rows() if not row.value()[2]]
+        if empty:
+            for row in empty:
+                row.label.get_style_context().add_class("error")
+            empty[0].label.grab_focus()
+            return "Give every status a name."
+        taken = {row.sid for row in self.rows() if row.sid}
+        keys, statuses = {}, []
+        for row in self.rows():
+            sid, color, label = row.value()
+            if sid is None:
+                sid = make_id(label, taken)
+                taken.add(sid)
+            keys[row.sid or f"new:{id(row)}"] = sid
+            statuses.append((sid, color, label))
+        return {
+            "statuses": statuses,
+            "default-status": keys.get(self.default_combo.get_active_id(), statuses[0][0]),
+            "call-status": keys.get(self.call_combo.get_active_id(), statuses[0][0]),
+            "timer-shortcuts": [
+                (keys[r.status.get_active_id()], int(r.minutes.get_value()))
+                for r in self.shortcut_rows() if r.status.get_active_id() in keys
+            ],
+            "theme": self.theme_combo.get_active_id() or "auto",
+        }
+
+    def save(self):
+        settings = self.collect()
+        if isinstance(settings, str):
+            self.message.set_text(settings)
+            return False
+        try:
+            write_settings(settings)
+        except OSError as e:
+            self.message.set_text(f"Could not save: {e.strerror}")
+            return False
+        # Icons and launcher actions; the tray picks the file up by itself.
+        toggle_output("--reload")
+        apply_theme(settings["theme"])
+        self.load()
+        self.message.set_text("Saved.")
+        if self.on_saved:
+            self.on_saved()
+        return True
 
 
 class App(Gtk.Application):
@@ -383,6 +826,7 @@ class App(Gtk.Application):
             self.window = Panel(self)
             self.window.show_all()
             self.window.refresh_header()  # hides "Cancel timer" if there's no timer
+            self.window.focus_status()
         self.window.present()
 
 

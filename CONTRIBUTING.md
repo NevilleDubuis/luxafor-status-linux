@@ -69,7 +69,9 @@ bin/luxafor-toggle     sets or cycles the status (calls luxafor-light), and gene
                        the status icons and the dock launcher (--reload)
 bin/luxafor-tray       tray icon showing the current status (Python + AppIndicator)
 bin/luxafor-callwatch  call detection: watches microphone streams with `pactl`
-bin/luxafor-panel      quick panel (Python + GTK 3); runs luxafor-toggle for every action
+bin/luxafor-panel      panel (Python + GTK 3): Status tab runs luxafor-toggle for every
+                       action; Settings tab reads settings through luxafor-toggle and
+                       rewrites statuses.conf
 share/statuses.conf    default status configuration
 share/icons/           application icon (luxafor-status)
 share/applications/    autostart templates (@BINDIR@ is replaced at install time)

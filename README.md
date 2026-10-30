@@ -88,16 +88,18 @@ Options:
 
 - **System tray**: the dot shows the current color. Right-click it:
 
-  <img src="docs/menu.png" alt="Tray menu: running timer and Cancel timer, then the statuses, the timer shortcuts, Other duration…, Off, Edit statuses…, Quit" width="256">
+  <img src="docs/menu.png" alt="Tray menu: running timer and Cancel timer, then the statuses, the timer shortcuts, More…, Off, Quit" width="256">
 
   - a status in one click;
   - a timer in one click (`timer-shortcuts`, see [Settings](#settings));
-  - **Other duration…** opens the panel (a middle-click on the dot too);
+  - **More…** opens the panel, for any duration and the settings (a
+    middle-click on the dot too);
   - while a timer runs, the time left shows next to the dot and at the top of
     the menu, with **Cancel timer**.
-- **Panel**, for any duration: "Luxafor Panel" in the app menu, or **Other
-  duration…** in the tray menu. Pick a duration (∞ = no timer), then click a
-  status. Keys `1`–`9` pick a status, `Esc` closes.
+- **Panel**: "Luxafor Panel" in the app menu, or **More…** in the tray menu.
+  On the **Status** tab, pick a duration (∞ = no timer), then click a status.
+  Keys `1`–`9` pick a status, `Esc` closes. The **Settings** tab is described
+  [below](#customizing-statuses).
 
   <img src="docs/panel.png" alt="The Luxafor panel, light: current status and timer, one button per status, durations" width="400"> <img src="docs/panel-dark.png" alt="The same panel in dark mode" width="400">
 
@@ -128,13 +130,26 @@ Options:
 
 ## Customizing statuses
 
-Statuses live in `~/.config/luxafor-status/statuses.conf`. Open it with:
+Open the panel (**More…** in the tray menu) and go to **Settings**:
 
-```bash
-luxafor-toggle --edit
-```
+<img src="docs/settings.png" alt="Settings tab: statuses with a color button and a name, buttons to reorder and delete; the status after a timer and during calls; the theme; the timers of the tray menu" width="380"> <img src="docs/settings-dark.png" alt="The same settings tab in dark mode" width="380">
 
-or from the tray menu → **Edit statuses…**
+- **Statuses**: click a color to change it, edit the names, reorder or delete
+  them, or add new ones. The dock button cycles through them in this order.
+- **After a timer**: the status to go back to when a timer ends.
+- **During calls**: the status used while you are in a call.
+- **Theme**: follow the desktop, or force light or dark.
+- **Timers in the tray menu**: the timers offered in one click (up to 6).
+
+Click **Save**: the tray, the dock button and the call detection pick the
+changes up right away.
+
+### The configuration file
+
+Everything is stored in `~/.config/luxafor-status/statuses.conf`, which you can
+also edit by hand (**Edit the file…** on the Settings tab, or
+`luxafor-toggle --edit`). Saving from the panel rewrites it — comments are not
+kept, the previous version is saved as `statuses.conf.bak`.
 
 One status per line, as `id | color | label`:
 

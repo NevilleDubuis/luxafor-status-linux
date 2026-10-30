@@ -116,7 +116,7 @@ short_timer() {  # status seconds
 short_timer focus 1; sleep 2.5
 eq "timer ends → default status" "$("$TOGGLE" --current)" dispo
 eq "timer file removed" "$([ -f "$TIMERF" ] && echo yes || echo no)" no
-short_timer focus 1; "$TOGGLE" pipe --keep-timer >/dev/null 2>&1; sleep 2.5
+short_timer focus 2; "$TOGGLE" pipe --keep-timer >/dev/null 2>&1; sleep 3.5
 eq "timer ends while another status is on → left alone" "$("$TOGGLE" --current)" pipe
 "$TOGGLE" focus >/dev/null 2>&1; echo "$(( $(date +%s) - 60 )) focus" > "$TIMERF"; "$TOGGLE" --resume-timer
 eq "timer expired while logged out → default status at login" "$("$TOGGLE" --current)" dispo
