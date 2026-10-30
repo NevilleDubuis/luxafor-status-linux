@@ -23,3 +23,28 @@ Description: control a Luxafor status light (ORB, Flag) from the desktop
  directly through its USB HID protocol, with no extra driver; a udev rule
  gives the logged-in user access to it without sudo.
 
+Package: luxafor-status
+Architecture: all
+Version: 1.1.0
+Priority: optional
+Section: utils
+Maintainer: Néville Dubuis <ndubuis@gmail.com>
+Installed-Size: 292
+Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-ayatanaappindicator3-0.1, pulseaudio-utils, gettext-base
+Recommends: libnotify-bin, xdg-utils
+Filename: pool/stable/luxafor-status_1.1.0_all.deb
+Size: 43636
+MD5sum: 3fd8ceec8441953db86c22c3a15b0af2
+SHA1: da8ef19098636447815e3c010fc7461c1d39f55d
+SHA256: 89af371f4a6bd1c5a9ae7bd1fc432c8da70849eeed9cc02e0084ce697ec272e8
+SHA512: d1343aaad6a953199d3eeb9b43b81138fe0384fbaf082aaabd4968e5430d8c73dc0d4479bd4e6a9d932e435a3ed888405874b4ad9ea7b5cd404dcf29228ffa5f
+Homepage: https://github.com/NevilleDubuis/luxafor-status-linux
+Description: control a Luxafor status light (ORB, Flag) from the desktop
+ Sets the color of a Luxafor USB status light from a dock launcher, a
+ system tray icon showing the current status, or the command line, and
+ switches it to a chosen status automatically while you are in a call.
+ .
+ Statuses (name and color) are configurable per user. The light is driven
+ directly through its USB HID protocol, with no extra driver; a udev rule
+ gives the logged-in user access to it without sudo.
+
