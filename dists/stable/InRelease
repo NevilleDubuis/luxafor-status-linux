@@ -4,7 +4,7 @@ Hash: SHA512
 Architectures: all amd64 arm64 armhf i386
 Codename: stable
 Components: main
-Date: Fri, 30 Oct 2026 14:44:52 +0000
+Date: Fri, 30 Oct 2026 15:33:14 +0000
 Description: luxafor-status (stable)
 Label: luxafor-status
 Origin: luxafor-status
@@ -55,8 +55,8 @@ SHA512:
  49d033909f925396d3043fb552bb03c5ac24aeded60625f8c2807be46f3db22c5ddec1a35f6cb0496648d642957f2c7bb291ccf9afdad984becec8dca797d9ef              808 main/binary-i386/Packages.gz
 -----BEGIN PGP SIGNATURE-----
 
-iHUEARYKAB0WIQTqOfcsyjpKQA813JbbwsnCvvfhqAUCauStZAAKCRDbwsnCvvfh
-qNkYAQDAlcsiHrx30tFNKzCpq+AJoBgxv+9Hs8YyykMuLLyvjAD/VXGdNh3kTv4u
-l+NwhNwHiG4yAr3ITID3GNkKfuHo1Ag=
-=P7W3
+iHUEARYKAB0WIQTqOfcsyjpKQA813JbbwsnCvvfhqAUCauS4ugAKCRDbwsnCvvfh
+qHq2AP4pk3n0WSnNTKvQQZfGBUCOBvSDFiVKKtTfra3cZ7hDXwD9HBH41wYmUP4g
+lIBaCTMEX6rY1OKo/6FIQUmh+nelGAM=
+=BbfI
 -----END PGP SIGNATURE-----
