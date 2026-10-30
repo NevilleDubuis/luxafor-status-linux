@@ -56,7 +56,16 @@ sudo apt update
 sudo apt install luxafor-status
 ```
 
-Use `testing` instead of `stable` to get pre-releases too.
+`apt` installs the dependencies, the udev rule and the launchers. The tray icon
+and the call detection start at each login — to start them right away, open
+**Luxafor Panel** from the app menu once (or log out and back in).
+
+New versions then arrive with `sudo apt upgrade`. Use `testing` instead of
+`stable` to get pre-releases (beta, release candidates) too.
+
+> [!TIP]
+> Already installed a `.deb` by hand? Just add the repository as above: your
+> settings are kept, and the next versions come through `apt`.
 
 ### Debian package
 
@@ -68,10 +77,8 @@ then:
 sudo apt install ./luxafor-status_*_all.deb
 ```
 
-`apt` installs the dependencies, the udev rule and the launchers. The tray icon
-and the call detection start at each login — to start them right away, open
-**Luxafor Panel** from the app menu once (or log out and back in). To remove it:
-`sudo apt remove luxafor-status`.
+You'll have to download each new version yourself — the apt repository above
+does it for you.
 
 ### From source
 
@@ -323,7 +330,7 @@ Translations are welcome — see [CONTRIBUTING](CONTRIBUTING.md#translations).
 | Problem | Fix |
 |---|---|
 | "light not connected" notification, or a dashed ring in the tray | The light isn't detected: check the cable (or the dock), then run `luxafor-light list`. The status is kept and shown again when the light is back. |
-| "cannot write to /dev/hidraw…" | The udev rule isn't active: re-run `./install.sh`, then unplug/replug the light. |
+| "cannot write to /dev/hidraw…" | The udev rule isn't active: unplug and replug the light. Still failing? With the package, run `sudo apt install --reinstall luxafor-status`; from source, re-run `./install.sh`. Then unplug/replug again. |
 | "unknown color" notification | Check the color in your `statuses.conf` — try a hex code like `#ff8800`. |
 | A status is missing from the menu | Run `luxafor-toggle --list`: invalid lines in `statuses.conf` are reported there. |
 | `luxafor-light list` shows nothing | Run `lsusb \| grep -i 04d8`. If your light shows a different ID than `04d8:f372`, please open an issue — it's probably a model that isn't supported yet. |
@@ -348,6 +355,18 @@ sudo rm -f /etc/udev/rules.d/99-busylights.rules
 ```
 
 ## Uninstall
+
+Package (apt repository or `.deb`):
+
+```bash
+sudo apt remove luxafor-status
+# and, if you added the apt repository:
+sudo rm /etc/apt/sources.list.d/luxafor-status.list /usr/share/keyrings/luxafor-status.gpg
+```
+
+Your statuses stay in `~/.config/luxafor-status/` (delete that folder to remove them too).
+
+Source install:
 
 ```bash
 ./uninstall.sh         # removes scripts, launchers and icons
