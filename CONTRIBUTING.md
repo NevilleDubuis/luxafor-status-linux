@@ -103,6 +103,10 @@ Runtime files:
   file changes (status set by hand, new timer, cancel). `--keep-timer` (used
   by `luxafor-callwatch`) sets a status without cancelling the timer.
 - `~/.local/share/luxafor-status/icons/` — one generated SVG per status (notifications).
+- `~/.local/share/icons/lxftrayx-<id>-<hash>.svg` — the same, as a dashed
+  ring, shown while the light is unplugged. The tray checks sysfs every second
+  (same lookup as `luxafor-light`, honouring `LUXAFOR_IDS` / `LUXAFOR_SYSFS`)
+  and runs `luxafor-toggle --apply` when the light comes back.
 - `~/.local/share/icons/lxftray-<id>-<hash>.svg` — tray icons, written by
   `luxafor-tray`. They live in the standard icon folder because some tray hosts
   (e.g. Budgie) ignore the indicator's custom icon path; the color hash in the

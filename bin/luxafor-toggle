@@ -10,6 +10,8 @@
 #   luxafor-toggle --list           list configured statuses
 #   luxafor-toggle --settings       show the settings (default and call status)
 #   luxafor-toggle --current        print the current status id
+#   luxafor-toggle --apply          show the current status on the light again
+#                                   (after plugging it back in)
 #   luxafor-toggle --edit           edit the configuration file (or use the
 #                                   Settings tab of luxafor-panel)
 #   luxafor-toggle --reload         regenerate icons and launcher after editing
@@ -293,17 +295,32 @@ show_timer() {
 
 # --- setting a status ---------------------------------------------------------
 
-# set_status <id> [notification text]
-set_status() {
-    local id="$1" i label
+# light <id>: sends a status to the light. Returns luxafor-light's status
+# (3: no light connected); its message is left in ERR.
+light() {
+    local i
     find_driver
-    if [ "$id" = off ]; then
-        ERR="$("$LIGHT" off 2>&1)" || die "${ERR#luxafor-light: }"
+    if [ "$1" = off ]; then
+        ERR="$("$LIGHT" off 2>&1)"
     else
-        i="$(index_of "$id")"
-        ERR="$("$LIGHT" "${COLORS[$i]}" 2>&1)" || die "${ERR#luxafor-light: }"
+        i="$(index_of "$1")"
+        ERR="$("$LIGHT" "${COLORS[$i]}" 2>&1)"
     fi
+}
+
+# set_status <id> [notification text]
+# Without a light (laptop away from its dock), the status is still kept:
+# the tray shows it on the light when it's plugged back in.
+set_status() {
+    local id="$1" label rc=0
+    light "$id" || rc=$?
     label="${2:-$(label_of "$id")}"
+    if [ "$rc" -eq 3 ]; then
+        label="$label — light not connected"
+        echo "luxafor-toggle: no light connected: '$id' will be shown when it's plugged back in" >&2
+    elif [ "$rc" -ne 0 ]; then
+        die "${ERR#luxafor-light: }"
+    fi
     mkdir -p "$(dirname "$STATE")"
     echo "$id" > "$STATE"
     local icon="$ICON_DIR/luxafor-$id.svg"
@@ -315,7 +332,7 @@ set_status() {
 
 case "${1:-}" in
     -h|--help)
-        sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     --edit)
         edit_config "${2:-}"; exit 0 ;;
 esac
@@ -334,6 +351,12 @@ while [ $# -gt 0 ]; do
             exit 0 ;;
         --current)
             cat "$STATE" 2>/dev/null || echo off; exit 0 ;;
+        --apply)
+            CUR="$(cat "$STATE" 2>/dev/null || echo off)"
+            if [ "$CUR" != off ] && ! index_of "$CUR" >/dev/null; then CUR=off; fi
+            rc=0; light "$CUR" || rc=$?
+            [ "$rc" -eq 0 ] || echo "${ERR}" >&2
+            exit "$rc" ;;
         --reload)
             reload; echo "Statuses reloaded."; exit 0 ;;
         --settings)

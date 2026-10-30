@@ -44,7 +44,12 @@ eq "other HID devices are left alone" "$(wc -c < "$TMP/dev/hidraw0" | tr -d ' ')
 "$LIGHT" Orange;     eq "CSS color name"         "$(bytes hidraw1)" "00 01 ff ff a5 00 00 00 00"
 "$LIGHT" off;        eq "off"                    "$(bytes hidraw1)" "00 01 ff 00 00 00 00 00 00"
 "$LIGHT" notacolor 2>/dev/null; eq "unknown color exits 2" "$?" 2
-LUXAFOR_IDS=dead:beef "$LIGHT" red 2>/dev/null; eq "no light exits 1" "$?" 1
+LUXAFOR_IDS=dead:beef "$LIGHT" red 2>/dev/null; eq "no light exits 3" "$?" 3
+chmod 444 "$TMP/dev/hidraw1"
+if ! [ -w "$TMP/dev/hidraw1" ]; then   # (root can write anyway)
+    "$LIGHT" red 2>/dev/null; eq "light not writable exits 1" "$?" 1
+fi
+chmod 644 "$TMP/dev/hidraw1"
 
 echo "luxafor-toggle"
 eq "default statuses from XDG_DATA_DIRS" "$("$TOGGLE" --list | awk '{print $1}' | paste -sd' ')" "available busy call off"
@@ -78,6 +83,19 @@ if command -v desktop-file-validate >/dev/null 2>&1; then
     if desktop-file-validate "$DESKTOP"; then ok "launcher passes desktop-file-validate"
     else fail "launcher passes desktop-file-validate"; fi
 fi
+
+echo "light unplugged"
+"$TOGGLE" focus >/dev/null 2>&1
+LUXAFOR_IDS=dead:beef "$TOGGLE" pipe >/dev/null 2>"$TMP/away.err"
+eq "status set while the light is away → succeeds" "$?" 0
+eq "…and is kept" "$("$TOGGLE" --current)" pipe
+eq "…saying it will be shown later" "$(grep -c 'no light connected' "$TMP/away.err")" 1
+eq "…without touching the light" "$(bytes hidraw1)" "00 01 ff 00 00 ff 00 00 00"
+: > "$TMP/dev/hidraw1"
+"$TOGGLE" --apply; eq "--apply → exit 0" "$?" 0
+eq "--apply shows the current status on the light" "$(bytes hidraw1)" "00 01 ff 80 00 80 00 00 00"
+LUXAFOR_IDS=dead:beef "$TOGGLE" --apply 2>/dev/null; eq "--apply without a light → exit 3" "$?" 3
+eq "--apply doesn't change the status" "$("$TOGGLE" --current)" pipe
 
 echo "editing"
 mkdir -p "$TMP/editbin"

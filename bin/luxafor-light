@@ -5,6 +5,8 @@
 #   luxafor-light off         turn the light off
 #   luxafor-light list        list connected Luxafor lights
 #
+# Exit status: 0 ok, 1 cannot write to the light, 2 unknown color, 3 no light.
+#
 # It writes the Luxafor HID "static color" command directly to the
 # light's /dev/hidraw* device:  01 FF R G B 00 00 00
 # (01 = static color, FF = all LEDs). Access without sudo is granted by
@@ -84,7 +86,7 @@ find_lights() {
 send() {
     local lights name sent=0 failed=0 bytes
     lights="$(find_lights)"
-    [ -n "$lights" ] || die "no Luxafor light found — is it plugged in?"
+    [ -n "$lights" ] || die "no Luxafor light found — is it plugged in?" 3
     bytes="$(printf '\\x%02x' 0 "$@")"
     while IFS=$'\t' read -r name _; do
         # shellcheck disable=SC2059  # the format string is built from hex escapes on purpose
@@ -103,11 +105,11 @@ send() {
 
 case "${1:-}" in
     ""|-h|--help)
-        sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
         [ -n "${1:-}" ]; exit $? ;;
     list)
         lights="$(find_lights)"
-        [ -n "$lights" ] || { echo "No Luxafor light found." >&2; exit 1; }
+        [ -n "$lights" ] || { echo "No Luxafor light found." >&2; exit 3; }
         i=0
         while IFS=$'\t' read -r name product; do
             printf '%d  %s  (%s/%s)\n' "$i" "$product" "$DEV" "$name"; i=$((i + 1))

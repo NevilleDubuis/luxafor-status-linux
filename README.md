@@ -212,6 +212,21 @@ for a while, then goes back to `default-status` with a notification.
 - Timers survive suspending the laptop. If you log out before a timer ends, it
   resumes at your next login (or ends right away if it's already over).
 
+## Light unplugged (docking station, laptop on the move)
+
+When the light is unplugged — say you take the laptop off its dock for a
+meeting — the tray notices within a couple of seconds:
+
+- the dot becomes a **dashed ring** in the status color, and the menu starts
+  with **⚠ Light not connected**;
+- a notification tells you the light is gone;
+- you can still change status (menu, panel, timers, calls): it's kept and
+  shown on the dashed ring.
+
+When you plug it back in, the light shows the current status again, with a
+notification. The same happens at login: the light picks up the status shown
+in the tray. To do it by hand: `luxafor-toggle --apply`.
+
 ## Automatic call status
 
 `luxafor-callwatch` starts at login and watches which applications use your
@@ -260,7 +275,7 @@ Changes to `call-status` apply from the next call. After editing
 
 | Problem | Fix |
 |---|---|
-| "no Luxafor light found" notification | Unplug/replug the light, then run `luxafor-light list`. |
+| "light not connected" notification, or a dashed ring in the tray | The light isn't detected: check the cable (or the dock), then run `luxafor-light list`. The status is kept and shown again when the light is back. |
 | "cannot write to /dev/hidraw…" | The udev rule isn't active: re-run `./install.sh`, then unplug/replug the light. |
 | "unknown color" notification | Check the color in your `statuses.conf` — try a hex code like `#ff8800`. |
 | A status is missing from the menu | Run `luxafor-toggle --list`: invalid lines in `statuses.conf` are reported there. |

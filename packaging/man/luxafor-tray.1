@@ -24,6 +24,12 @@ It follows changes made by
 from anywhere (launcher, keyboard shortcut, terminal) and reloads the
 configuration when the file is saved.
 .PP
+It watches for the light: when it is unplugged (laptop off its dock), the
+dot becomes a dashed ring, the menu starts with
+.BR "Light not connected" ,
+and a notification says so. When it is plugged back in \(em and at login
+\(em the light shows the current status again.
+.PP
 It is started at login through
 .IR /etc/xdg/autostart/luxafor-tray.desktop .
 .PP
