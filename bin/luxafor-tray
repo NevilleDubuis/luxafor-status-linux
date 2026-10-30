@@ -283,23 +283,22 @@ class Tray:
             add(label, [sid])
         separator()
 
-        # Timers, in one click; anything else in the panel
+        # Timers in one click; "More…": any duration, and the settings
         for sid, minutes in self.shortcuts:
             add(f"{self.label_of(sid)} for {human_minutes(minutes)}", [sid, "--for", str(minutes)])
-        other = add("Other duration…", action=lambda: spawn(PANEL))
+        more = add("More…", action=lambda: spawn(PANEL))
         separator()
 
         # Off isn't a status: the light is just off
         add("Off", ["off"])
         separator()
 
-        add("Edit statuses…", ["--edit", "--gui"])
         add("Quit", action=Gtk.main_quit)
         menu.show_all()
         self.ind.set_menu(menu)
         # Middle-click on the icon opens the panel. Set after set_menu: the
         # target must belong to the menu in use.
-        self.ind.set_secondary_activate_target(other)
+        self.ind.set_secondary_activate_target(more)
 
     def tick(self):
         # An exception escaping a GLib timeout callback removes the timeout:
