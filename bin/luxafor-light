@@ -2,18 +2,23 @@
 # luxafor-light — minimal driver for Luxafor USB lights, no dependencies.
 #
 #   luxafor-light <color>     set a color: name (red, orange…) or hex (#ff8800)
+#   luxafor-light <color> blink [slow|fast]   make the light blink
 #   luxafor-light off         turn the light off
 #   luxafor-light list        list connected Luxafor lights
 #
-# Exit status: 0 ok, 1 cannot write to the light, 2 unknown color, 3 no light.
+# Exit status: 0 ok, 1 cannot write to the light, 2 unknown color or effect,
+# 3 no light.
 #
-# It writes the Luxafor HID "static color" command directly to the
-# light's /dev/hidraw* device:  01 FF R G B 00 00 00
-# (01 = static color, FF = all LEDs). Access without sudo is granted by
-# the udev rule installed with luxafor-status.
+# It writes Luxafor HID commands directly to the light's /dev/hidraw*
+# device. Static color: 01 FF R G B 00 00 00 (01 = static color, FF = all
+# LEDs). Blinking: 03 FF R G B <speed> 00 00 (03 = strobe, repeat 0 =
+# forever: the light blinks by itself until the next command). Access
+# without sudo is granted by the udev rule installed with luxafor-status.
 #
 # Environment:
 #   LUXAFOR_BRIGHTNESS  brightness in percent, 5–100 (default: 100)
+#   LUXAFOR_BLINK_SPEED blink speed, 1–255, lower is faster (overrides
+#                   slow / normal / fast — to try other speeds)
 #   LUXAFOR_IDS     space-separated vendor:product IDs to look for
 #                   (default: 04d8:f372)
 #   LUXAFOR_SYSFS   sysfs root, for tests (default: /sys)
@@ -45,6 +50,8 @@ tf() {
 IDS="${LUXAFOR_IDS:-04d8:f372}"
 SYSFS="${LUXAFOR_SYSFS:-/sys}"
 DEV="${LUXAFOR_DEV:-/dev}"
+# Strobe periods for "blink slow / blink / blink fast" (lower is faster).
+BLINK_SLOW=180 BLINK_NORMAL=90 BLINK_FAST=30
 
 die() { echo "luxafor-light: $1" >&2; exit "${2:-1}"; }
 
@@ -128,7 +135,7 @@ send() {
 
 case "${1:-}" in
     ""|-h|--help)
-        sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
         [ -n "${1:-}" ]; exit $? ;;
     list)
         lights="$(find_lights)"
@@ -142,11 +149,25 @@ case "${1:-}" in
         send 1 255 0 0 0 0 0 0 ;;
     *)
         rgb="$(parse_color "$1")" || die "$(tf "unknown color '%s' — use a name (red, orange…) or a hex code (#ff8800)" "$1")" 2
+        # Effect: steady (default), or blink at a speed (strobe period:
+        # lower is faster).
+        cmd=1 speed=0
+        case "${2:-steady}:${3:-}" in
+            steady:|none:) ;;
+            blink:|blink:normal|blink-normal:) cmd=3 speed=$BLINK_NORMAL ;;
+            blink:slow|blink-slow:) cmd=3 speed=$BLINK_SLOW ;;
+            blink:fast|blink-fast:) cmd=3 speed=$BLINK_FAST ;;
+            *) die "$(tf "unknown effect '%s' — use: blink, blink slow, blink fast" "${*:2}")" 2 ;;
+        esac
+        if [ "$cmd" -eq 3 ] && [[ "${LUXAFOR_BLINK_SPEED:-}" =~ ^[0-9]+$ ]] \
+           && [ "$LUXAFOR_BLINK_SPEED" -ge 1 ] && [ "$LUXAFOR_BLINK_SPEED" -le 255 ]; then
+            speed="$LUXAFOR_BLINK_SPEED"
+        fi
         b="${LUXAFOR_BRIGHTNESS:-100}"
         if [[ "$b" =~ ^[0-9]+$ ]] && [ "$b" -ge 1 ] && [ "$b" -lt 100 ]; then
             read -r r g bl <<< "$rgb"
             rgb="$(( (r * b + 50) / 100 )) $(( (g * b + 50) / 100 )) $(( (bl * b + 50) / 100 ))"
         fi
         # shellcheck disable=SC2086  # split "R G B" into three arguments
-        send 1 255 $rgb 0 0 0 ;;
+        send "$cmd" 255 $rgb "$speed" 0 0 ;;
 esac

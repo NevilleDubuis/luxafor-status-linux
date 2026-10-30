@@ -27,7 +27,7 @@ with open(f"{TMP}/config/luxafor-status/statuses.conf", "w") as f:
         "available | green   | Available\n"
         "busy      | red     | Busy\n"
         "call      | yellow  | On a call\n"
-        "focus     | #0000ff | Focus — do not disturb\n"
+        "focus     | #0000ff | Focus — do not disturb | blink-slow\n"
         "default-status = available\n"
         "timer-shortcuts = focus 1h30, busy 30, nope 10\n"
     )
@@ -125,6 +125,16 @@ eq("header shows the timer", w.head_timer.get_text().endswith("30 min left, then
 eq("header doesn't repeat the status", w.head_timer.get_text().startswith("until "), True)
 eq("cancel button visible with a timer", w.cancel_button.get_visible(), True)
 eq("∞ selected by default", w.duration_buttons[None].get_active(), True)
+
+
+def dot_of(button):
+    return button.get_child().get_children()[0]
+
+
+eq("blinking status: its dot blinks too",
+   dot_of(w.status_buttons["focus"]).get_style_context().has_class("lx-blink-slow"), True)
+eq("steady status: its dot doesn't",
+   [c for c in dot_of(w.status_buttons["busy"]).get_style_context().list_classes() if c.startswith("lx-blink")], [])
 
 if "--screenshot" in sys.argv:
     out = sys.argv[sys.argv.index("--screenshot") + 1]
@@ -236,6 +246,8 @@ eq("timer shortcuts loaded (invalid one dropped)",
    [(r.status.get_active_id(), int(r.minutes.get_value())) for r in page.shortcut_rows()],
    [("focus", 90), ("busy", 30)])
 eq("theme loaded", page.theme_combo.get_active_id(), "auto")
+eq("effects loaded", [r.effect.get_active_id() for r in page.rows()],
+   ["steady", "steady", "steady", "blink-slow"])
 eq("nothing to save yet", page.save_button.get_sensitive(), False)
 eq("keys 1–9 do nothing on the settings tab", key(w, Gdk.KEY_2), False)
 
@@ -254,6 +266,7 @@ blue = Gdk.RGBA()
 blue.parse("#123456")
 rows[0].color.set_rgba(blue)
 rows[0].color.emit("color-set")
+rows[1].effect.set_active_id("blink-fast")
 page.move(rows[3], -1)
 eq("move up", labels_of(page.rows())[2], "Focus — do not disturb")
 page.add_status()
@@ -279,6 +292,14 @@ listed = {l.split()[0]: l.split(None, 2) for l in toggle("--list").splitlines()}
 eq("changed color written as hex", listed["available"][1], "#123456")
 eq("unchanged color kept as written", listed["busy"][1], "red")
 eq("label saved", listed["busy"][2], "Occupé")
+eq("effects saved", toggle("--list-effects").splitlines(),
+   ["available steady", "busy blink-fast", "focus blink-slow", "pause-cafe steady"])
+eq("…as a 4th field, only for blinking statuses",
+   [l.split("|")[3].strip() if l.count("|") == 3 else None
+    for l in open(CONF_PATH).read().splitlines() if "|" in l and not l.startswith("#")],
+   [None, "blink-fast", "blink-slow", None])
+eq("status tab: the new blinking status blinks",
+   dot_of(w.status_buttons["busy"]).get_style_context().has_class("lx-blink-fast"), True)
 eq("call status saved", toggle("--setting", "call-status"), "available")
 eq("timer shortcuts saved", toggle("--setting", "timer-shortcuts").splitlines(),
    ["focus 90", "busy 30", "pause-cafe 15"])

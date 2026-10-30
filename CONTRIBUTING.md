@@ -107,7 +107,7 @@ docs/                  README images
 Runtime files:
 
 - `~/.config/luxafor-status/statuses.conf` — the user's statuses
-  (`id | color | label`) and settings (`key = value`: `default-status`,
+  (`id | color | label [| effect]`) and settings (`key = value`: `default-status`,
   `call-status`, `call-apps`, `lock-status`, `dnd-statuses`, `timer-shortcuts`,
   `brightness`, `theme`). `luxafor-toggle` and `luxafor-tray` both parse the statuses
   and must stay in sync if the format changes; other tools read settings with

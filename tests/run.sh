@@ -51,6 +51,13 @@ eq "other HID devices are left alone" "$(wc -c < "$TMP/dev/hidraw0" | tr -d ' ')
 "$LIGHT" Orange;     eq "CSS color name"         "$(bytes hidraw1)" "00 01 ff ff a5 00 00 00 00"
 "$LIGHT" off;        eq "off"                    "$(bytes hidraw1)" "00 01 ff 00 00 00 00 00 00"
 "$LIGHT" notacolor 2>/dev/null; eq "unknown color exits 2" "$?" 2
+"$LIGHT" red blink;        eq "blink → strobe report, repeat forever" "$(bytes hidraw1)" "00 03 ff ff 00 00 5a 00 00"
+"$LIGHT" red blink slow;   eq "blink slow"  "$(bytes hidraw1)" "00 03 ff ff 00 00 b4 00 00"
+"$LIGHT" red blink-fast;   eq "blink-fast"  "$(bytes hidraw1)" "00 03 ff ff 00 00 1e 00 00"
+"$LIGHT" red steady;       eq "steady = static color" "$(bytes hidraw1)" "00 01 ff ff 00 00 00 00 00"
+LUXAFOR_BLINK_SPEED=50 LUXAFOR_BRIGHTNESS=50 "$LIGHT" red blink
+eq "LUXAFOR_BLINK_SPEED and brightness apply to blinking" "$(bytes hidraw1)" "00 03 ff 80 00 00 32 00 00"
+"$LIGHT" red wobble 2>/dev/null; eq "unknown effect exits 2" "$?" 2
 LUXAFOR_IDS=dead:beef "$LIGHT" red 2>/dev/null; eq "no light exits 3" "$?" 3
 chmod 444 "$TMP/dev/hidraw1"
 if ! [ -w "$TMP/dev/hidraw1" ]; then   # (root can write anyway)
@@ -72,9 +79,16 @@ dispo   | lime    | Disponible
 focus   | #0000ff | Focus — ne pas déranger
 Bad Id  | red     | ignored
 pipe    | purple  | Label | with pipe
+alert   | red     | Alerte | blink-fast
+quiet   | blue    |  | blink-slow
 EOF
-eq "user config: invalid lines skipped" "$("$TOGGLE" --list 2>/dev/null | awk '{print $1}' | paste -sd' ')" "dispo focus pipe off"
+eq "user config: invalid lines skipped" "$("$TOGGLE" --list 2>/dev/null | awk '{print $1}' | paste -sd' ')" "dispo focus pipe alert quiet off"
 eq "labels keep spaces, accents and pipes" "$("$TOGGLE" --list 2>/dev/null | sed -n 3p | cut -c25-)" "Label | with pipe"
+eq "effect (4th field) isn't part of the label" "$("$TOGGLE" --list 2>/dev/null | sed -n 4p | cut -c25-)" "Alerte"
+eq "…no label: the id" "$("$TOGGLE" --list 2>/dev/null | sed -n 5p | cut -c25-)" "quiet"
+eq "--list-effects" "$("$TOGGLE" --list-effects | paste -sd,)" "dispo steady,focus steady,pipe steady,alert blink-fast,quiet blink-slow"
+"$TOGGLE" alert >/dev/null 2>&1
+eq "blinking status → strobe" "$(bytes hidraw1)" "00 03 ff ff 00 00 1e 00 00"
 "$TOGGLE" focus >/dev/null 2>&1
 eq "set by id" "$(bytes hidraw1)" "00 01 ff 00 00 ff 00 00 00"
 "$TOGGLE" nope >/dev/null 2>&1; eq "unknown id exits 2" "$?" 2
@@ -84,8 +98,8 @@ echo "legacy-green" > "$XDG_CACHE_HOME/luxafor-state"
 
 "$TOGGLE" --reload >/dev/null 2>&1
 DESKTOP="$XDG_DATA_HOME/applications/luxafor.desktop"
-eq "launcher: open panel, then one action per status" "$(sed -n 's/^Actions=//p' "$DESKTOP")" "panel;dispo;focus;pipe;off;"
-eq "one icon per status, plus off" "$(find "$XDG_DATA_HOME/luxafor-status/icons" -name "*.svg" | wc -l | tr -d ' ')" 4
+eq "launcher: open panel, then one action per status" "$(sed -n 's/^Actions=//p' "$DESKTOP")" "panel;dispo;focus;pipe;alert;quiet;off;"
+eq "one icon per status, plus off" "$(find "$XDG_DATA_HOME/luxafor-status/icons" -name "*.svg" | wc -l | tr -d ' ')" 6
 if command -v desktop-file-validate >/dev/null 2>&1; then
     if desktop-file-validate "$DESKTOP"; then ok "launcher passes desktop-file-validate"
     else fail "launcher passes desktop-file-validate"; fi
@@ -164,7 +178,7 @@ printf 'brightness = 300\nlock-status = nope\n' >> "$XDG_CONFIG_HOME/luxafor-sta
 eq "invalid brightness → 100" "$("$TOGGLE" --setting brightness)" 100
 eq "invalid lock-status → off" "$("$TOGGLE" --setting lock-status)" off
 printf 'brightness = 100\nlock-status =\ndnd-statuses =\ncall-apps =\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
-eq "settings lines are not statuses" "$("$TOGGLE" --list 2>/dev/null | awk '{print $1}' | paste -sd' ')" "dispo focus pipe off"
+eq "settings lines are not statuses" "$("$TOGGLE" --list 2>/dev/null | awk '{print $1}' | paste -sd' ')" "dispo focus pipe alert quiet off"
 eq "timer shortcuts default: first non-default status, 30 min and 1 h" "$("$TOGGLE" --setting timer-shortcuts | paste -sd,)" "dispo 30,dispo 60"
 printf 'timer-shortcuts = focus 1h30, nope 30, focus soon, pipe 15\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
 eq "timer shortcuts: valid entries kept, in order" "$("$TOGGLE" --setting timer-shortcuts | paste -sd,)" "focus 90,pipe 15"

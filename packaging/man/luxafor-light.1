@@ -4,6 +4,8 @@ luxafor-light \- set the color of a Luxafor USB status light
 .SH SYNOPSIS
 .B luxafor-light
 .I color
+.RB [ blink
+.RB [ slow | fast ]]
 .br
 .B luxafor-light off
 .br
@@ -20,6 +22,17 @@ is a hex code
 .RI ( #ff8800 " or " #f80 )
 or a CSS color name such as
 .BR red ", " orange ", " yellow ", " lime ", " green ", " blue ", " purple .
+.PP
+With
+.BR blink ,
+the light blinks in that color by itself (Luxafor "strobe" command) until
+the next command;
+.B blink slow
+and
+.B blink fast
+change the speed
+.RB ( blink\-slow " and " blink\-fast
+work too).
 .SH COMMANDS
 .TP
 .B off
@@ -32,6 +45,11 @@ List connected Luxafor lights.
 .B LUXAFOR_BRIGHTNESS
 Brightness in percent, 5 to 100 (default: 100).
 .TP
+.B LUXAFOR_BLINK_SPEED
+Blink speed, 1 to 255, lower is faster: overrides
+.BR slow / fast ,
+to try other speeds.
+.TP
 .B LUXAFOR_IDS
 Space-separated USB
 .IR vendor : product
@@ -42,7 +60,7 @@ IDs to look for (default: 04d8:f372).
 Gives the logged-in user access to the light without sudo.
 .SH EXIT STATUS
 0 on success, 1 if the light could not be written to, 2 for an unknown
-color, 3 if no light is connected.
+color or effect, 3 if no light is connected.
 .SH SEE ALSO
 .BR luxafor-toggle (1),
 .BR luxafor-tray (1)

@@ -17,6 +17,7 @@ Control a **Luxafor** status light from Ubuntu, with:
   your screen is locked, and comes back when you unlock;
 - 🔕 **do not disturb** (optional) — desktop notifications silenced while you're busy;
 - 🔌 **docking stations** — the status comes back when the light is plugged in again;
+- ✨ **blinking statuses** — slow, normal or fast, handled by the light itself;
 - 🔆 **brightness** setting; interface in **English and French**.
 
 Default statuses:
@@ -161,8 +162,9 @@ Open the panel (**More…** in the tray menu) and go to **Settings**:
 
 <img src="docs/settings.png" alt="Settings tab: statuses with a color button and a name, buttons to reorder and delete; the status after a timer and during calls; the theme; the timers of the tray menu" width="380"> <img src="docs/settings-dark.png" alt="The same settings tab in dark mode" width="380">
 
-- **Statuses**: click a color to change it, edit the names, reorder or delete
-  them, or add new ones. The dock button cycles through them in this order.
+- **Statuses**: click a color to change it, edit the names, make a status
+  blink (slowly, normally or fast — its dot blinks in the panel too), reorder
+  or delete them, or add new ones. The dock button cycles through them in this order.
 - **After a timer**: the status to go back to when a timer ends.
 - **During calls**: the status used while you are in a call, or *Don't change*
   to turn call detection off.
@@ -183,14 +185,14 @@ also edit by hand (**Edit the file…** on the Settings tab, or
 `luxafor-toggle --edit`). Saving from the panel rewrites it — comments are not
 kept, the previous version is saved as `statuses.conf.bak`.
 
-One status per line, as `id | color | label`:
+One status per line, as `id | color | label`, optionally followed by `| effect`:
 
 ```
 available | green   | Available
 busy      | red     | Busy
-call      | yellow  | On a call
+call      | yellow  | On a call | blink
 focus     | #0000ff | Focus — do not disturb
-lunch     | orange  | Lunch break
+lunch     | orange  | Lunch break | blink-slow
 ```
 
 - **id** — the short name for `luxafor-toggle <id>` (lowercase letters, digits, `-`, `_`; `off` is reserved);
@@ -199,7 +201,9 @@ lunch     | orange  | Lunch break
   `skyblue`, `blue`, `royalblue`, `navy`, `purple`, `violet`, `magenta`, `pink`,
   `hotpink`, `crimson`, `coral`, `white`… (CSS names — `green` is CSS green, a darker
   green; use `lime` for full green);
-- **label** — what you see in menus and notifications; any language, spaces allowed.
+- **label** — what you see in menus and notifications; any language, spaces allowed;
+- **effect** (optional) — `blink`, `blink-slow` or `blink-fast`: the light blinks
+  by itself until the status changes. Without it, the color is steady.
 
 Add as many statuses as you like. The dock button cycles through them in file
 order, then off. The tray icon picks up changes automatically when you save;

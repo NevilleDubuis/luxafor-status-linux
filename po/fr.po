@@ -3,8 +3,9 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: luxafor-status\n"
-"Report-Msgid-Bugs-To: https://github.com/NevilleDubuis/luxafor-status-linux/issues\n"
-"POT-Creation-Date: 2026-10-30 14:00+0100\n"
+"Report-Msgid-Bugs-To: https://github.com/NevilleDubuis/luxafor-status-linux/"
+"issues\n"
+"POT-Creation-Date: 2026-10-30 16:20+0100\n"
 "PO-Revision-Date: 2026-10-30 14:30+0100\n"
 "Last-Translator: Néville Dubuis\n"
 "Language-Team: French\n"
@@ -14,132 +15,152 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: bin/luxafor-panel:109 bin/luxafor-tray:273
+#: bin/luxafor-panel:65
+msgid "Steady"
+msgstr "Fixe"
+
+#: bin/luxafor-panel:65
+msgid "Blink slowly"
+msgstr "Clignote lentement"
+
+#: bin/luxafor-panel:66
+msgid "Blink"
+msgstr "Clignote"
+
+#: bin/luxafor-panel:66
+msgid "Blink fast"
+msgstr "Clignote vite"
+
+#: bin/luxafor-panel:129 bin/luxafor-tray:282
 #, python-brace-format
 msgid "{minutes} min"
 msgstr "{minutes} min"
 
-#: bin/luxafor-panel:112 bin/luxafor-tray:276
+#: bin/luxafor-panel:132 bin/luxafor-tray:285
 #, python-brace-format
 msgid "{hours} h"
 msgstr "{hours} h"
 
-#: bin/luxafor-panel:113 bin/luxafor-tray:277
+#: bin/luxafor-panel:133 bin/luxafor-tray:286
 #, python-brace-format
 msgid "{hours} h {minutes:02d}"
 msgstr "{hours} h {minutes:02d}"
 
-#: bin/luxafor-panel:237 bin/luxafor-panel:354
+#: bin/luxafor-panel:261 bin/luxafor-panel:379
 msgid "Status"
 msgstr "Statut"
 
-#: bin/luxafor-panel:249
+#: bin/luxafor-panel:273
 msgid "Settings"
 msgstr "Réglages"
 
-#: bin/luxafor-panel:269 bin/luxafor-tray:479
+#: bin/luxafor-panel:293 bin/luxafor-tray:488
 msgid "Cancel timer"
 msgstr "Annuler le minuteur"
 
-#: bin/luxafor-panel:277
+#: bin/luxafor-panel:301
 msgid "1 · DURATION"
 msgstr "1 · DURÉE"
 
-#: bin/luxafor-panel:285
+#: bin/luxafor-panel:309
 msgid "Custom duration"
 msgstr "Durée personnalisée"
 
-#: bin/luxafor-panel:293 bin/luxafor-panel:602
+#: bin/luxafor-panel:317 bin/luxafor-panel:640
 msgid "min"
 msgstr "min"
 
-#: bin/luxafor-panel:307
+#: bin/luxafor-panel:331
 msgid "2 · STATUS"
 msgstr "2 · STATUT"
 
-#: bin/luxafor-panel:333
+#: bin/luxafor-panel:357
 msgid "Pick a duration, then a status · Esc to close"
 msgstr "Choisissez une durée, puis un statut · Échap pour fermer"
 
-#: bin/luxafor-panel:384
+#: bin/luxafor-panel:409
 #, python-brace-format
 msgid "until {time} · {left} left, then {status}"
 msgstr "jusqu’à {time} · encore {left}, puis {status}"
 
-#: bin/luxafor-panel:390
+#: bin/luxafor-panel:415
 msgid "No timer"
 msgstr "Pas de minuteur"
 
-#: bin/luxafor-panel:445
+#: bin/luxafor-panel:470
 msgid "Don't change"
 msgstr "Ne pas changer"
 
-#: bin/luxafor-panel:446
+#: bin/luxafor-panel:471
 msgid "Light off"
 msgstr "Lampe éteinte"
 
-#: bin/luxafor-panel:448
+#: bin/luxafor-panel:473
 msgid "Follow the desktop"
 msgstr "Comme le bureau"
 
-#: bin/luxafor-panel:448
+#: bin/luxafor-panel:473
 msgid "Light"
 msgstr "Clair"
 
-#: bin/luxafor-panel:448
+#: bin/luxafor-panel:473
 msgid "Dark"
 msgstr "Sombre"
 
-#: bin/luxafor-panel:570
+#: bin/luxafor-panel:600
 #, python-brace-format
 msgid "Color of “{status}”"
 msgstr "Couleur de « {status} »"
 
-#: bin/luxafor-panel:577
+#: bin/luxafor-panel:609
+msgid "How the light shows this status"
+msgstr "Comment la lumière affiche ce statut"
+
+#: bin/luxafor-panel:614
 msgid "Move up"
 msgstr "Monter"
 
-#: bin/luxafor-panel:578
+#: bin/luxafor-panel:615
 msgid "Move down"
 msgstr "Descendre"
 
-#: bin/luxafor-panel:579 bin/luxafor-panel:603
+#: bin/luxafor-panel:616 bin/luxafor-panel:641
 msgid "Delete"
 msgstr "Supprimer"
 
-#: bin/luxafor-panel:600
+#: bin/luxafor-panel:638
 msgid "for"
 msgstr "pendant"
 
-#: bin/luxafor-panel:617
+#: bin/luxafor-panel:655
 msgid "STATUSES"
 msgstr "STATUTS"
 
-#: bin/luxafor-panel:620
+#: bin/luxafor-panel:658
 msgid "Add status"
 msgstr "Ajouter un statut"
 
-#: bin/luxafor-panel:641
+#: bin/luxafor-panel:679
 msgid "After a timer"
 msgstr "Après un minuteur"
 
-#: bin/luxafor-panel:641
+#: bin/luxafor-panel:679
 msgid "Status to go back to when a timer ends"
 msgstr "Statut repris à la fin d’un minuteur"
 
-#: bin/luxafor-panel:642
+#: bin/luxafor-panel:680
 msgid "During calls"
 msgstr "Pendant les appels"
 
-#: bin/luxafor-panel:642
+#: bin/luxafor-panel:680
 msgid "Status used automatically while you are in a call"
 msgstr "Statut utilisé automatiquement pendant un appel"
 
-#: bin/luxafor-panel:643
+#: bin/luxafor-panel:681
 msgid "Screen locked"
 msgstr "Écran verrouillé"
 
-#: bin/luxafor-panel:644
+#: bin/luxafor-panel:682
 msgid ""
 "Status while the screen is locked; the previous one comes back when you "
 "unlock"
@@ -147,192 +168,195 @@ msgstr ""
 "Statut pendant que l’écran est verrouillé ; le précédent revient au "
 "déverrouillage"
 
-#: bin/luxafor-panel:645
+#: bin/luxafor-panel:683
 msgid "Brightness"
 msgstr "Luminosité"
 
-#: bin/luxafor-panel:645
+#: bin/luxafor-panel:683
 msgid "Brightness of the light"
 msgstr "Luminosité de la lampe"
 
-#: bin/luxafor-panel:646
+#: bin/luxafor-panel:684
 msgid "Theme"
 msgstr "Thème"
 
-#: bin/luxafor-panel:646
+#: bin/luxafor-panel:684
 msgid "Look of this panel"
 msgstr "Apparence de ce panneau"
 
-#: bin/luxafor-panel:655
+#: bin/luxafor-panel:693
 msgid "BEHAVIOR"
 msgstr "COMPORTEMENT"
 
-#: bin/luxafor-panel:660
+#: bin/luxafor-panel:698
 msgid "DO NOT DISTURB"
 msgstr "NE PAS DÉRANGER"
 
-#: bin/luxafor-panel:661
+#: bin/luxafor-panel:699
 msgid "Silence desktop notifications while:"
 msgstr "Couper les notifications du bureau pendant :"
 
-#: bin/luxafor-panel:662
+#: bin/luxafor-panel:700
 msgid "Optional: you may still want to see incoming call notifications"
 msgstr ""
 "Facultatif : vous voudrez peut-être quand même voir les appels entrants"
 
-#: bin/luxafor-panel:672
+#: bin/luxafor-panel:710
 msgid "TIMERS IN THE TRAY MENU"
 msgstr "MINUTEURS DU MENU"
 
-#: bin/luxafor-panel:675
+#: bin/luxafor-panel:713
 msgid "Add timer"
 msgstr "Ajouter un minuteur"
 
-#: bin/luxafor-panel:682
+#: bin/luxafor-panel:720
 msgid "Edit the file…"
 msgstr "Modifier le fichier…"
 
-#: bin/luxafor-panel:691
+#: bin/luxafor-panel:729
 msgid "Revert"
 msgstr "Annuler"
 
-#: bin/luxafor-panel:693
+#: bin/luxafor-panel:731
 msgid "Save"
 msgstr "Enregistrer"
 
-#: bin/luxafor-panel:744
+#: bin/luxafor-panel:782
 msgid "(no name)"
 msgstr "(sans nom)"
 
-#: bin/luxafor-panel:818
+#: bin/luxafor-panel:856
 msgid "Keep at least one status."
 msgstr "Gardez au moins un statut."
 
-#: bin/luxafor-panel:857
+#: bin/luxafor-panel:895
 msgid "Give every status a name."
 msgstr "Donnez un nom à chaque statut."
 
-#: bin/luxafor-panel:889
+#: bin/luxafor-panel:927
 #, python-brace-format
 msgid "Could not save: {error}"
 msgstr "Enregistrement impossible : {error}"
 
-#: bin/luxafor-panel:896
+#: bin/luxafor-panel:934
 msgid "Saved."
 msgstr "Enregistré."
 
-#: bin/luxafor-tray:441 bin/luxafor-tray:495
+#: bin/luxafor-tray:450 bin/luxafor-tray:504
 msgid "Off"
 msgstr "Éteint"
 
-#: bin/luxafor-tray:447
+#: bin/luxafor-tray:456
 #, python-brace-format
 msgid "{status} until {time} ({left} left)"
 msgstr "{status} jusqu’à {time} (encore {left})"
 
-#: bin/luxafor-tray:472
+#: bin/luxafor-tray:481
 msgid "Light not connected"
 msgstr "Lampe non connectée"
 
-#: bin/luxafor-tray:489
+#: bin/luxafor-tray:498
 #, python-brace-format
 msgid "{status} for {duration}"
 msgstr "{status} pendant {duration}"
 
-#: bin/luxafor-tray:491
+#: bin/luxafor-tray:500
 msgid "More…"
 msgstr "Plus…"
 
-#: bin/luxafor-tray:498
+#: bin/luxafor-tray:507
 msgid "Quit"
 msgstr "Quitter"
 
-#: bin/luxafor-tray:529
+#: bin/luxafor-tray:538
 #, python-brace-format
 msgid "{status} — light not connected"
 msgstr "{status} — lampe non connectée"
 
-#: bin/luxafor-tray:607
+#: bin/luxafor-tray:616
 #, python-brace-format
 msgid ""
 "Light disconnected — {status} will be shown again when it's plugged back in"
-msgstr ""
-"Lampe déconnectée — {status} sera réaffiché quand elle sera rebranchée"
+msgstr "Lampe déconnectée — {status} sera réaffiché quand elle sera rebranchée"
 
-#: bin/luxafor-tray:618
+#: bin/luxafor-tray:627
 #, python-brace-format
 msgid "Light reconnected — {status}"
 msgstr "Lampe reconnectée — {status}"
 
-#: bin/luxafor-toggle:89
+#: bin/luxafor-toggle:94
 msgid "Available"
 msgstr "Disponible"
 
-#: bin/luxafor-toggle:89
+#: bin/luxafor-toggle:94
 msgid "Busy"
 msgstr "Occupé"
 
-#: bin/luxafor-toggle:89
+#: bin/luxafor-toggle:94
 msgid "On a call"
 msgstr "En appel"
 
-#: bin/luxafor-toggle:261
+#: bin/luxafor-toggle:272
 msgid "Change the Luxafor light status"
 msgstr "Changer le statut de la lampe Luxafor"
 
-#: bin/luxafor-toggle:268
+#: bin/luxafor-toggle:279
 msgid "Open panel…"
 msgstr "Ouvrir le panneau…"
 
-#: bin/luxafor-toggle:322
+#: bin/luxafor-toggle:333
 msgid "%d min"
 msgstr "%d min"
 
-#: bin/luxafor-toggle:324
+#: bin/luxafor-toggle:335
 msgid "%d h"
 msgstr "%d h"
 
-#: bin/luxafor-toggle:326
+#: bin/luxafor-toggle:337
 msgid "%d h %02d"
 msgstr "%d h %02d"
 
-#: bin/luxafor-toggle:368
+#: bin/luxafor-toggle:379
 msgid "Timer ended — %s"
 msgstr "Minuteur terminé — %s"
 
-#: bin/luxafor-toggle:375
+#: bin/luxafor-toggle:386
 msgid "No timer."
 msgstr "Pas de minuteur."
 
-#: bin/luxafor-toggle:380
+#: bin/luxafor-toggle:391
 msgid "%s until %s (%s left), then %s\\n"
 msgstr "%s jusqu’à %s (encore %s), puis %s\\n"
 
-#: bin/luxafor-toggle:408
+#: bin/luxafor-toggle:423
 msgid "%s — light not connected"
 msgstr "%s — lampe non connectée"
 
-#: bin/luxafor-toggle:479
+#: bin/luxafor-toggle:497
 msgid "Timer cancelled"
 msgstr "Minuteur annulé"
 
-#: bin/luxafor-toggle:523
+#: bin/luxafor-toggle:541
 msgid "%s for %s — until %s"
 msgstr "%s pendant %s — jusqu’à %s"
 
-#: bin/luxafor-light:112
+#: bin/luxafor-light:119
 msgid "no Luxafor light found — is it plugged in?"
 msgstr "aucune lampe Luxafor trouvée — est-elle branchée ?"
 
-#: bin/luxafor-light:120
+#: bin/luxafor-light:127
 msgid "cannot write to %s (permission denied? replug the light)"
 msgstr "impossible d’écrire sur %s (permission refusée ? rebranchez la lampe)"
 
-#: bin/luxafor-light:144
+#: bin/luxafor-light:151
 msgid "unknown color '%s' — use a name (red, orange…) or a hex code (#ff8800)"
 msgstr ""
 "couleur inconnue « %s » — utilisez un nom (red, orange…) ou un code "
 "hexadécimal (#ff8800)"
+
+#: bin/luxafor-light:160
+msgid "unknown effect '%s' — use: blink, blink slow, blink fast"
+msgstr "effet inconnu « %s » — utilisez : blink, blink slow, blink fast"
 
 #: bin/luxafor-callwatch:142
 msgid "pactl not found — install it with: sudo apt install pulseaudio-utils"
