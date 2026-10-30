@@ -12,7 +12,12 @@ Control a **Luxafor** status light from Ubuntu, with:
 - 🎨 **your own statuses** — as many as you want, with any name and color;
 - ⏱ **timers** — "busy for 30 minutes", then back to your default status;
 - 📞 **automatic call status** — the light switches to a status of your choice
-  while you're in a call in your browser (Teams, Odoo, Google Meet, Jitsi…).
+  while you're in a call in your browser (Teams, Odoo, Google Meet, Jitsi…);
+- 🔒 **screen lock** — the light turns off (or a status of your choice) while
+  your screen is locked, and comes back when you unlock;
+- 🔕 **do not disturb** (optional) — desktop notifications silenced while you're busy;
+- 🔌 **docking stations** — the status comes back when the light is plugged in again;
+- 🔆 **brightness** setting; interface in **English and French**.
 
 Default statuses:
 
@@ -137,8 +142,13 @@ Open the panel (**More…** in the tray menu) and go to **Settings**:
 - **Statuses**: click a color to change it, edit the names, reorder or delete
   them, or add new ones. The dock button cycles through them in this order.
 - **After a timer**: the status to go back to when a timer ends.
-- **During calls**: the status used while you are in a call.
+- **During calls**: the status used while you are in a call, or *Don't change*
+  to turn call detection off.
+- **Screen locked**: light off (default), a status, or *Don't change*.
+- **Brightness**: from 5 to 100 %.
 - **Theme**: follow the desktop, or force light or dark.
+- **Do not disturb**: the statuses during which desktop notifications are
+  silenced (none by default — you may want to see incoming calls).
 - **Timers in the tray menu**: the timers offered in one click (up to 6).
 
 Click **Save**: the tray, the dock button and the call detection pick the
@@ -178,18 +188,31 @@ Your configuration is kept when you re-run `./install.sh`.
 
 ### Settings
 
-The same file holds two settings, as `key = value` lines:
+The same file holds the settings, as `key = value` lines:
 
 ```ini
 # Status to go back to when a timer ends (default: available, or your first status)
 default-status = available
 
-# Status used automatically while you are in a call (default: call)
+# Status during calls (default: call); "none" turns call detection off
 call-status = call
+
+# Apps that count as "in a call" when they use the microphone
+# (matched against the app name; default: common web browsers)
+call-apps = firefox chrome chromium brave msedge vivaldi opera
+
+# Status while the screen is locked: a status, "off" (default), or "none"
+lock-status = off
+
+# Statuses during which desktop notifications are silenced (default: none)
+dnd-statuses = busy
 
 # Timers offered in one click in the tray menu: "<status> <duration>",
 # separated by commas (default: your first non-default status, 30 min and 1 h)
 timer-shortcuts = busy 30, busy 1h, focus 1h30
+
+# Brightness of the light, 5–100 % (default: 100)
+brightness = 100
 
 # Look of the panel: auto (default), light or dark
 theme = auto
@@ -245,31 +268,40 @@ To check what it sees, run this **during a call**:
 luxafor-callwatch --check
 ```
 
-To choose the status used during calls, set `call-status` in your
-statuses (`luxafor-toggle --edit`). Other options go in
-`~/.config/luxafor-status/callwatch.conf`:
-
-```ini
-# Apps that count as "in a call" when they use the microphone
-# (matched against the app name; default: common web browsers)
-apps = firefox chrome chromium brave msedge vivaldi opera
-
-# Set to "no" to turn call detection off
-enabled = yes
-```
-
-Changes to `call-status` apply from the next call. After editing
-`callwatch.conf`, log out and back in (or restart it:
-`pkill -f luxafor-callwatch; luxafor-callwatch &`).
-
-> [!TIP]
-> Versions up to 0.2 read the call status from `status = …` in `callwatch.conf`.
-> That still works, but `call-status` in `statuses.conf` takes precedence.
+The status used during calls and the watched apps are set in the
+[settings](#settings) (`call-status`, `call-apps`); changes apply from the next
+call. *Don't change* (`call-status = none`) turns call detection off.
 
 > [!NOTE]
 > Any recording by a watched app counts as a call — for example a voice message
 > recorded in a browser tab, or the microphone test screen before joining a
 > Teams meeting.
+
+## Screen lock
+
+When you lock your screen (a coffee, a meeting room), the light turns off — or
+switches to the status set in **Screen locked** — and the status from before
+comes back when you unlock. If the status changed meanwhile (a call, by hand),
+it's left alone. A running timer keeps running.
+
+It follows the screensaver of Budgie and GNOME (and KDE, Cinnamon, MATE, or
+logind's lock hint). It's done by the tray icon, so it needs the tray to run.
+
+## Do not disturb
+
+Optional: tick statuses under **Do not disturb** in the settings, and desktop
+notifications are silenced while one of them is on. Your own setting is put
+back afterwards, also if the tray quits. It's off by default because you may
+still want to see notifications of incoming calls.
+
+It uses the desktop's own *Do not disturb* switch (Budgie's, or GNOME's
+notification banners).
+
+## Languages
+
+The interface is in English and French, following your desktop's language.
+The names of the shipped statuses are translated too, until you edit them.
+Translations are welcome — see [CONTRIBUTING](CONTRIBUTING.md#translations).
 
 ## Troubleshooting
 
@@ -282,10 +314,15 @@ Changes to `call-status` apply from the next call. After editing
 | `luxafor-light list` shows nothing | Run `lsusb \| grep -i 04d8`. If your light shows a different ID than `04d8:f372`, please open an issue — it's probably a model that isn't supported yet. |
 | No tray icon | Make sure the "System Tray" applet is on your panel. On GNOME, install the *AppIndicator Support* extension. |
 | Tray icon stops updating | Run `luxafor-tray &`: it replaces the running one. Errors are logged to `~/.cache/luxafor-tray.log` — please attach it to an issue. If an old icon stays behind, restart the panel (`budgie-panel --replace &` on Budgie) or log out and back in. |
-| Call status doesn't switch | Run `luxafor-callwatch --check` during the call: is your browser listed? If it has an unusual name, add it to `apps`. If the call detection reports that `pactl` is missing: `sudo apt install pulseaudio-utils`. |
+| Call status doesn't switch | Run `luxafor-callwatch --check` during the call: is your browser listed? If it has an unusual name, add it to `call-apps`. If the call detection reports that `pactl` is missing: `sudo apt install pulseaudio-utils`. |
 | `luxafor-toggle: command not found` | Log out and back in so `~/.local/bin` is on your `PATH`. |
 
 ## Upgrading from an earlier version
+
+From 0.x to 1.0: `~/.config/luxafor-status/callwatch.conf` is no longer read.
+Its settings moved to `statuses.conf` (`call-status`, `call-apps`; `enabled = no`
+becomes `call-status = none`) — or set them in the panel. A notification
+reminds you if the old file is still there.
 
 Versions before the built-in driver used `busylight-for-humans`. Once the new
 version works, you can remove it:

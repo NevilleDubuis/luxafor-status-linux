@@ -6,6 +6,7 @@
 They use a fake light and isolated config dirs, like tests/run.sh.
 """
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -37,6 +38,8 @@ os.environ.update(
     XDG_DATA_HOME=f"{TMP}/data",
     LUXAFOR_SYSFS=f"{TMP}/sys",
     LUXAFOR_DEV=f"{TMP}/dev",
+    GSETTINGS_BACKEND="memory",  # do-not-disturb tests never touch real settings
+    LC_ALL="C.UTF-8", LANGUAGE="en",  # English messages; translations tested at the end
 )
 os.makedirs(os.environ["HOME"])
 TOGGLE = f"{ROOT}/bin/luxafor-toggle"
@@ -67,6 +70,8 @@ def eq(name, got, want):
     else:
         FAIL += 1
         print(f"  \033[31m✗\033[0m {name}\n      expected [{want}], got [{got}]")
+        if os.environ.get("GITHUB_ACTIONS"):  # readable in the CI summary
+            print(f"::error title=UI test failed::{name}: expected [{want}], got [{got}]")
 
 
 def pump(seconds=0.3):
@@ -293,6 +298,26 @@ if "--screenshot" in sys.argv:
     Gdk.pixbuf_get_from_window(win, 0, 0, win.get_width(), win.get_height()).savev(out, "png", [], [])
     print(f"  (screenshot: {out})")
 
+eq("screen locked: light off by default", page.lock_combo.get_active_id(), "off")
+eq("…choices: light off, the statuses, don't change",
+   [page.lock_combo.get_model()[0][0], page.lock_combo.get_model()[len(page.lock_combo.get_model()) - 1][0]],
+   ["Light off", "Don't change"])
+eq("brightness loaded", int(page.brightness.get_value()), 100)
+eq("no dnd status by default", [c.key for c in page.dnd_checks() if c.get_active()], [])
+page.lock_combo.set_active_id("focus")
+page.call_combo.set_active_id("none")
+page.brightness.set_value(60)
+next(c for c in page.dnd_checks() if c.key == "busy").set_active(True)
+eq("save behavior settings", page.save(), True)
+eq("lock-status saved", toggle("--setting", "lock-status"), "focus")
+eq("call-status none saved (call detection off)", toggle("--setting", "call-status"), "none")
+eq("brightness saved", toggle("--setting", "brightness"), "60")
+eq("dnd-statuses saved", toggle("--setting", "dnd-statuses"), "busy")
+eq("reloaded: dnd check box kept", [c.key for c in page.dnd_checks() if c.get_active()], ["busy"])
+page.lock_combo.set_active_id("none")
+page.load()
+eq("revert puts the combo boxes back too", page.lock_combo.get_active_id(), "focus")
+
 page.rows()[0].label.set_text("   ")
 eq("empty name → not saved", page.save(), False)
 eq("…with a message", page.message.get_text(), "Give every status a name.")
@@ -412,10 +437,98 @@ try:
     eq("…status shown on the light again", open(f"{TMP}/dev/hidraw0", "rb").read().hex(), "0001ffffff00000000")  # call = yellow
     eq("…normal icon", tray.ind.get_icon().startswith("lxftray-call-"), True)
     eq("…warning gone", labels()[0] != "⚠ Light not connected", True)
+
+    # Screen lock (Budgie and GNOME: org.gnome.ScreenSaver ActiveChanged)
+    Gio = panel_ns["Gio"]
+    conn = Gio.bus_get_sync(Gio.BusType.SESSION)
+
+    def screensaver(active):
+        conn.emit_signal(None, "/org/gnome/ScreenSaver", "org.gnome.ScreenSaver",
+                         "ActiveChanged", GLib.Variant("(b)", (active,)))
+        pump(1.2)
+
+    CONF_PATH = f"{TMP}/config/luxafor-status/statuses.conf"
+
+    def add_setting(line):
+        with open(CONF_PATH, "a") as f:
+            f.write(line + "\n")
+        pump(1.5)  # the tray reloads the file when it changes
+
+    toggle("busy")
+    pump(1.2)
+    screensaver(True)
+    eq("screen locked → light off (default lock-status)", toggle("--current"), "off")
+    screensaver(False)
+    eq("unlocked → previous status back", toggle("--current"), "busy")
+    toggle("busy", "--for", "30")
+    screensaver(True)
+    eq("locking keeps a running timer", "30 min left" in toggle("--timer"), True)
+    screensaver(False)
+    eq("…and the timed status comes back", toggle("--current"), "busy")
+    toggle("--cancel-timer")
+    screensaver(True)
+    toggle("call")
+    screensaver(False)
+    eq("status changed while locked is kept", toggle("--current"), "call")
+    add_setting("lock-status = focus")
+    screensaver(True)
+    eq("lock-status = focus", toggle("--current"), "focus")
+    screensaver(False)
+    eq("…back after unlocking", toggle("--current"), "call")
+    add_setting("lock-status = none")
+    screensaver(True)
+    eq("lock-status = none → status left alone", toggle("--current"), "call")
+    screensaver(False)
+
+    # Do not disturb
+    dnd = tray.dnd
+    eq("do-not-disturb switch found", dnd.available, True)
+    if dnd.available:
+        toggle("busy")
+        pump(1.2)
+        eq("no dnd-statuses → notifications left alone", dnd.get(), False)
+        add_setting("dnd-statuses = busy, focus")
+        eq("busy is a dnd status → notifications silenced", dnd.get(), True)
+        toggle("focus")
+        pump(1.2)
+        eq("…still while switching to another dnd status", dnd.get(), True)
+        toggle("available")
+        pump(1.2)
+        eq("other status → notifications back", dnd.get(), False)
+        dnd.set(True)  # the user had silenced notifications themselves
+        toggle("busy")
+        pump(1.2)
+        toggle("available")
+        pump(1.2)
+        eq("…and the user's own setting is put back", dnd.get(), True)
+        dnd.set(False)
+        toggle("busy")
+        pump(1.2)
+        tray.restore_dnd()
+        eq("quitting the tray never leaves notifications silenced", dnd.get(), False)
     toggle("--cancel-timer")
 except Exception as e:  # AppIndicator needs a D-Bus session
     FAIL += 1
     print(f"  \033[31m✗\033[0m tray could not start: {e}")
+
+print("translations")
+if shutil.which("msgfmt"):
+    subprocess.run([f"{ROOT}/po/build.sh", f"{TMP}/locale"], check=True, capture_output=True)
+    probe = (
+        "import sys\n"
+        "for name in ('luxafor-panel', 'luxafor-tray'):\n"
+        "    src = open(sys.argv[1] + '/bin/' + name).read().replace('if __name__ == \"__main__\":', 'if False:')\n"
+        "    ns = {'__file__': sys.argv[1] + '/bin/' + name, '__name__': 'x'}\n"
+        "    exec(compile(src, name, 'exec'), ns)\n"
+        "    print(ns['_']('Settings'), '|', ns['_']('More…'), '|', ns['human_minutes'](90))\n"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", probe, ROOT], capture_output=True, text=True,
+        env=dict(os.environ, LUXAFOR_LOCALEDIR=f"{TMP}/locale", LANGUAGE="fr", LC_ALL="", LANG="fr_CH.UTF-8"),
+    ).stdout.splitlines()
+    eq("panel and tray in French", out, ["Réglages | Plus… | 1 h 30", "Réglages | Plus… | 1 h 30"])
+else:
+    print("  (skipped: needs msgfmt)")
 
 print(f"\n{PASS} passed, {FAIL} failed")
 subprocess.run(["rm", "-rf", TMP])

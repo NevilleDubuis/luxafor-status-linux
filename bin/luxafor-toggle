@@ -17,6 +17,28 @@
 #   luxafor-toggle --reload         regenerate icons and launcher after editing
 set -u
 
+# --- translations (gettext domain luxafor-status) -----------------------------
+TEXTDOMAIN=luxafor-status
+TEXTDOMAINDIR=""
+for _dir in "${LUXAFOR_LOCALEDIR:-}" "${XDG_DATA_HOME:-$HOME/.local/share}/locale" \
+            /usr/local/share/locale /usr/share/locale; do
+    if [ -n "$_dir" ] && compgen -G "$_dir/*/LC_MESSAGES/$TEXTDOMAIN.mo" >/dev/null; then
+        TEXTDOMAINDIR="$_dir"; break
+    fi
+done
+export TEXTDOMAIN TEXTDOMAINDIR
+# t "text": translated text. tf "format" args…: translated printf format.
+t() {
+    if [ -n "$TEXTDOMAINDIR" ] && command -v gettext >/dev/null 2>&1; then gettext "$1"
+    else printf '%s' "$1"; fi
+}
+tf() {
+    local format
+    format="$(t "$1")"; shift
+    # shellcheck disable=SC2059  # the format is the (translated) message
+    printf -- "$format" "$@"
+}
+
 BINDIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -58,11 +80,13 @@ die() { echo "luxafor-toggle: $1" >&2; notify "$1"; exit "${2:-1}"; }
 # settings ("key = value" lines) into SET_DEFAULT / SET_CALL.
 load_statuses() {
     IDS=(); COLORS=(); LABELS=(); SET_DEFAULT=""; SET_CALL=""; SET_THEME=""; SET_SHORTCUTS="-"
+    SET_LOCK=""; SET_DND=""; SET_BRIGHTNESS=""; SET_APPS=""
     local file="$CONF" line id color label key value n=0
-    [ -f "$file" ] || file="$DEFAULT_CONF"
+    local own=1
+    [ -f "$file" ] || { file="$DEFAULT_CONF"; own=0; }
     if [ ! -f "$file" ]; then
         IDS=(available busy call); COLORS=(green red yellow)
-        LABELS=("Available" "Busy" "On a call"); resolve_settings; return
+        LABELS=("$(t Available)" "$(t Busy)" "$(t "On a call")"); resolve_settings; return
     fi
     while IFS= read -r line || [ -n "$line" ]; do
         n=$((n + 1))
@@ -76,6 +100,10 @@ load_statuses() {
                 call-status)    SET_CALL="$value" ;;
                 theme)          SET_THEME="$value" ;;
                 timer-shortcuts) SET_SHORTCUTS="$value" ;;
+                lock-status)    SET_LOCK="$value" ;;
+                dnd-statuses)   SET_DND="$value" ;;
+                brightness)     SET_BRIGHTNESS="$value" ;;
+                call-apps)      SET_APPS="$value" ;;
                 *) [ "$VERBOSE" -eq 1 ] && echo "luxafor-toggle: unknown setting '$key' on line $n in $file" >&2 ;;
             esac
             continue
@@ -86,7 +114,10 @@ load_statuses() {
             [ "$VERBOSE" -eq 1 ] && echo "luxafor-toggle: ignoring invalid line $n in $file: $line" >&2
             continue
         fi
-        IDS+=("$id"); COLORS+=("$color"); LABELS+=("${label:-$id}")
+        label="${label:-$id}"
+        # Shipped defaults (no statuses of the user's own yet): translated.
+        [ "$own" -eq 1 ] || label="$(t "$label")"
+        IDS+=("$id"); COLORS+=("$color"); LABELS+=("$label")
     done < "$file"
     [ "${#IDS[@]}" -gt 0 ] || die "no valid status in $file"
     resolve_settings
@@ -109,9 +140,50 @@ resolve_settings() {
            [ "$VERBOSE" -eq 1 ] && echo "luxafor-toggle: theme '$SET_THEME' should be auto, light or dark" >&2 ;;
     esac
     resolve_shortcuts
-    if [ -n "$SET_CALL" ] && ! index_of "$SET_CALL" >/dev/null && [ "$VERBOSE" -eq 1 ]; then
-        echo "luxafor-toggle: call-status '$SET_CALL' is not one of your statuses" >&2
+
+    # CALL_STATUS: status during calls, or "none" (no call detection).
+    if [ "$SET_CALL" = none ] || { [ -n "$SET_CALL" ] && index_of "$SET_CALL" >/dev/null; }; then
+        CALL_STATUS="$SET_CALL"
+    else
+        if [ -n "$SET_CALL" ] && [ "$VERBOSE" -eq 1 ]; then
+            echo "luxafor-toggle: call-status '$SET_CALL' is not one of your statuses" >&2
+        fi
+        if index_of call >/dev/null; then CALL_STATUS=call; else CALL_STATUS=none; fi
     fi
+
+    # LOCK_STATUS: status while the screen is locked, "off", or "none" (leave
+    # the status alone). Default: off.
+    if [ "$SET_LOCK" = none ] || [ "$SET_LOCK" = off ] || { [ -n "$SET_LOCK" ] && index_of "$SET_LOCK" >/dev/null; }; then
+        LOCK_STATUS="$SET_LOCK"
+    else
+        if [ -n "$SET_LOCK" ] && [ "$VERBOSE" -eq 1 ]; then
+            echo "luxafor-toggle: lock-status '$SET_LOCK' is not one of your statuses" >&2
+        fi
+        LOCK_STATUS=off
+    fi
+
+    # DND_STATUSES: statuses during which desktop notifications are silenced.
+    DND_STATUSES=()
+    local d
+    for d in ${SET_DND//,/ }; do
+        if index_of "$d" >/dev/null; then DND_STATUSES+=("$d")
+        elif [ "$VERBOSE" -eq 1 ]; then
+            echo "luxafor-toggle: dnd-statuses: '$d' is not one of your statuses" >&2
+        fi
+    done
+
+    # BRIGHTNESS: 5–100 %.
+    if [[ "$SET_BRIGHTNESS" =~ ^[0-9]+$ ]] && [ "$SET_BRIGHTNESS" -ge 5 ] && [ "$SET_BRIGHTNESS" -le 100 ]; then
+        BRIGHTNESS="$SET_BRIGHTNESS"
+    else
+        if [ -n "$SET_BRIGHTNESS" ] && [ "$VERBOSE" -eq 1 ]; then
+            echo "luxafor-toggle: brightness '$SET_BRIGHTNESS' should be a percentage from 5 to 100" >&2
+        fi
+        BRIGHTNESS=100
+    fi
+
+    # CALL_APPS: applications that count as "in a call" when recording.
+    CALL_APPS="${SET_APPS:-firefox chrome chromium brave msedge edge vivaldi opera epiphany falkon}"
 }
 
 # SHORTCUTS: "<id> <minutes>" entries for the tray menu, from
@@ -145,7 +217,14 @@ resolve_shortcuts() {
 
 label_of() {
     local i
-    if [ "$1" = off ]; then echo Off; elif i="$(index_of "$1")"; then echo "${LABELS[$i]}"; else echo "$1"; fi
+    if [ "$1" = off ]; then
+        t Off
+        echo
+    elif i="$(index_of "$1")"; then
+        echo "${LABELS[$i]}"
+    else
+        echo "$1"
+    fi
 }
 
 index_of() {
@@ -179,20 +258,20 @@ reload() {
         echo "[Desktop Entry]"
         echo "Type=Application"
         echo "Name=Luxafor"
-        echo "Comment=Change the Luxafor light status"
+        echo "Comment=$(t "Change the Luxafor light status")"
         echo "Exec=$BINDIR/luxafor-toggle"
         echo "Icon=luxafor-status"
         echo "Terminal=false"
         echo "Categories=Utility;"
         echo "Keywords=luxafor;busylight;status;"
         echo "Actions=panel;${actions}off;"
-        printf '\n[Desktop Action panel]\nName=Open panel…\nExec=%s/luxafor-panel\n' "$BINDIR"
+        printf '\n[Desktop Action panel]\nName=%s\nExec=%s/luxafor-panel\n' "$(t "Open panel…")" "$BINDIR"
         for i in "${!IDS[@]}"; do
             id="${IDS[$i]}"
             printf '\n[Desktop Action %s]\nName=%s\nExec=%s/luxafor-toggle %s\n' \
                 "$id" "$(desktop_escape "${LABELS[$i]}")" "$BINDIR" "$id"
         done
-        printf '\n[Desktop Action off]\nName=Off\nExec=%s/luxafor-toggle off\n' "$BINDIR"
+        printf '\n[Desktop Action off]\nName=%s\nExec=%s/luxafor-toggle off\n' "$(t Off)" "$BINDIR"
     } > "$DESKTOP_FILE"
     command -v update-desktop-database >/dev/null 2>&1 \
         && update-desktop-database "$(dirname "$DESKTOP_FILE")" >/dev/null 2>&1
@@ -238,9 +317,15 @@ parse_duration() {
 
 human_minutes() {  # seconds → "25 min" / "1 h" / "1 h 30"
     local m=$(( ($1 + 59) / 60 ))
-    if [ "$m" -lt 60 ]; then echo "$m min"
-    elif [ $((m % 60)) -eq 0 ]; then echo "$((m / 60)) h"
-    else printf '%d h %02d\n' $((m / 60)) $((m % 60)); fi
+    # (one call per line: xgettext only sees calls at the start of a line)
+    if [ "$m" -lt 60 ]; then
+        tf '%d min' "$m"
+    elif [ $((m % 60)) -eq 0 ]; then
+        tf '%d h' $((m / 60))
+    else
+        tf '%d h %02d' $((m / 60)) $((m % 60))
+    fi
+    echo
 }
 
 # Starts the background process that ends the timer. It sleeps in short
@@ -280,15 +365,19 @@ finish_timer() {
     [ "$(cat "$TIMER" 2>/dev/null)" = "$1" ] || return 0
     rm -f "$TIMER"
     if [ "$(cat "$STATE" 2>/dev/null || echo off)" = "$status" ]; then
-        set_status "$DEFAULT_STATUS" "Timer ended — $(label_of "$DEFAULT_STATUS")"
+        set_status "$DEFAULT_STATUS" "$(tf 'Timer ended — %s' "$(label_of "$DEFAULT_STATUS")")"
     fi
 }
 
 show_timer() {
     local end status now
-    if ! read -r end status 2>/dev/null < "$TIMER"; then echo "No timer."; return; fi
+    if ! read -r end status 2>/dev/null < "$TIMER"; then
+        t "No timer."
+        echo
+        return
+    fi
     now="$(date +%s)"
-    printf '%s until %s (%s left), then %s\n' "$(label_of "$status")" \
+    tf '%s until %s (%s left), then %s\n' "$(label_of "$status")" \
         "$(date -d "@$end" +%H:%M)" "$(human_minutes $(( end > now ? end - now : 0 )))" \
         "$(label_of "$DEFAULT_STATUS")"
 }
@@ -304,7 +393,7 @@ light() {
         ERR="$("$LIGHT" off 2>&1)"
     else
         i="$(index_of "$1")"
-        ERR="$("$LIGHT" "${COLORS[$i]}" 2>&1)"
+        ERR="$(LUXAFOR_BRIGHTNESS="$BRIGHTNESS" "$LIGHT" "${COLORS[$i]}" 2>&1)"
     fi
 }
 
@@ -316,7 +405,7 @@ set_status() {
     light "$id" || rc=$?
     label="${2:-$(label_of "$id")}"
     if [ "$rc" -eq 3 ]; then
-        label="$label — light not connected"
+        label="$(tf '%s — light not connected' "$label")"
         echo "luxafor-toggle: no light connected: '$id' will be shown when it's plugged back in" >&2
     elif [ "$rc" -ne 0 ]; then
         die "${ERR#luxafor-light: }"
@@ -347,7 +436,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --list)
             for i in "${!IDS[@]}"; do printf '%-12s %-10s %s\n' "${IDS[$i]}" "${COLORS[$i]}" "${LABELS[$i]}"; done
-            printf '%-12s %-10s %s\n' off - Off
+            printf '%-12s %-10s %s\n' off - "$(t Off)"
             exit 0 ;;
         --current)
             cat "$STATE" 2>/dev/null || echo off; exit 0 ;;
@@ -360,17 +449,25 @@ while [ $# -gt 0 ]; do
         --reload)
             reload; echo "Statuses reloaded."; exit 0 ;;
         --settings)
-            echo "default-status = $DEFAULT_STATUS"
-            echo "call-status    = ${SET_CALL:-(not set — see luxafor-callwatch)}"
-            echo "theme          = $THEME"
             sc=""
             for e in "${SHORTCUTS[@]}"; do sc+="${sc:+, }$e"; done
+            echo "default-status  = $DEFAULT_STATUS"
+            echo "call-status     = $CALL_STATUS"
+            echo "call-apps       = $CALL_APPS"
+            echo "lock-status     = $LOCK_STATUS"
+            echo "dnd-statuses    = ${DND_STATUSES[*]:-(none)}"
             echo "timer-shortcuts = ${sc:-(none)}"
+            echo "brightness      = $BRIGHTNESS"
+            echo "theme           = $THEME"
             exit 0 ;;
         --setting)
             case "${2:-}" in
                 default-status) echo "$DEFAULT_STATUS" ;;
-                call-status) [ -n "$SET_CALL" ] && echo "$SET_CALL" ;;
+                call-status) echo "$CALL_STATUS" ;;
+                call-apps) echo "$CALL_APPS" ;;
+                lock-status) echo "$LOCK_STATUS" ;;
+                dnd-statuses) echo "${DND_STATUSES[*]}" ;;
+                brightness) echo "$BRIGHTNESS" ;;
                 theme) echo "$THEME" ;;
                 timer-shortcuts) [ "${#SHORTCUTS[@]}" -eq 0 ] || printf '%s\n' "${SHORTCUTS[@]}" ;;
                 *) echo "Unknown setting '${2:-}'" >&2; exit 2 ;;
@@ -379,7 +476,7 @@ while [ $# -gt 0 ]; do
         --timer)
             show_timer; exit 0 ;;
         --cancel-timer)
-            if [ -f "$TIMER" ]; then rm -f "$TIMER"; stop_timer_watchers; notify "Timer cancelled"; fi
+            if [ -f "$TIMER" ]; then rm -f "$TIMER"; stop_timer_watchers; notify "$(t "Timer cancelled")"; fi
             exit 0 ;;
         --resume-timer)   # at login: restart the watcher, or end an expired timer
             if read -r end _ 2>/dev/null < "$TIMER"; then
@@ -423,7 +520,7 @@ if [ -n "$DURATION" ]; then
     SECS="$(parse_duration "$DURATION")" \
         || { echo "Invalid duration '$DURATION' — use minutes (30), or 45m, 1h, 1h30 (max 24h)" >&2; exit 2; }
     END=$(( $(date +%s) + SECS ))
-    set_status "$NEXT" "$(label_of "$NEXT") for $(human_minutes "$SECS") — until $(date -d "@$END" +%H:%M)"
+    set_status "$NEXT" "$(tf '%s for %s — until %s' "$(label_of "$NEXT")" "$(human_minutes "$SECS")" "$(date -d "@$END" +%H:%M)")"
     mkdir -p "$(dirname "$TIMER")"
     echo "$END $NEXT" > "$TIMER"
     start_timer_watcher "$END $NEXT"

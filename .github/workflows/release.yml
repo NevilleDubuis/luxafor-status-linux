@@ -27,7 +27,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq lintian desktop-file-utils
+          sudo apt-get install -y -qq lintian desktop-file-utils gettext
 
       - name: Tests
         run: tests/run.sh

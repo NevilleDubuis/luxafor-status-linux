@@ -24,6 +24,7 @@ rm -f  "$DATA_HOME"/icons/lxftray-*.svg "$DATA_HOME"/icons/lxftrayx-*.svg
 rm -rf "$DATA_HOME/luxafor-status"
 rm -f  "$CONFIG_HOME/autostart/luxafor-tray.desktop" "$CONFIG_HOME/autostart/luxafor-callwatch.desktop"
 rm -f  "$CACHE_HOME/luxafor-state"
+rm -f  "$DATA_HOME"/locale/*/LC_MESSAGES/luxafor-status.mo
 update-desktop-database "$DATA_HOME/applications" >/dev/null 2>&1 || true
 echo "✓ luxafor-status uninstalled"
 

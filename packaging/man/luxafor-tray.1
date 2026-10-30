@@ -30,6 +30,18 @@ dot becomes a dashed ring, the menu starts with
 and a notification says so. When it is plugged back in \(em and at login
 \(em the light shows the current status again.
 .PP
+When the screen is locked, the light switches to the
+.B lock-status
+setting (off by default) and the status from before comes back when it is
+unlocked, unless it was changed meanwhile. It follows the screensaver D-Bus
+interfaces of Budgie, GNOME, KDE, Cinnamon and MATE, and logind's LockedHint.
+.PP
+While the status is one of
+.BR dnd-statuses ,
+desktop notifications are silenced through the desktop's own "do not
+disturb" switch; the user's setting is put back afterwards and when the tray
+quits.
+.PP
 It is started at login through
 .IR /etc/xdg/autostart/luxafor-tray.desktop .
 .PP

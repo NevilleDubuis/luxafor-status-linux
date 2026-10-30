@@ -17,12 +17,19 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq shellcheck lintian appstream desktop-file-utils \
+          sudo apt-get install -y -qq shellcheck lintian appstream desktop-file-utils gettext locales \
             python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 \
-            xvfb dbus librsvg2-common
+            xvfb dbus librsvg2-common gsettings-desktop-schemas
+          sudo locale-gen fr_CH.UTF-8   # translation tests
 
       - name: ShellCheck
-        run: shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle bin/luxafor-callwatch packaging/build-deb.sh tests/run.sh
+        run: shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle bin/luxafor-callwatch packaging/build-deb.sh tests/run.sh po/*.sh
+
+      - name: Translations up to date
+        run: |
+          po/update-pot.sh
+          git diff --exit-code -I POT-Creation-Date po/ || { echo "::error::Run po/update-pot.sh and commit the result"; exit 1; }
+          msgfmt --check -o /dev/null po/*.po
 
       - name: Python
         run: |

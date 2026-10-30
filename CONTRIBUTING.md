@@ -81,6 +81,7 @@ uninstall.sh           uninstaller for the per-user install
 packaging/             .deb build script, man pages, AppStream metadata
 tests/run.sh           tests with a fake light
 tests/ui.py            panel and tray tests, under a virtual display
+po/                    translations (gettext): template, *.po, build and update scripts
 docs/                  README images
 .github/workflows/     CI (checks + package build) and releases
 ```
@@ -89,11 +90,12 @@ Runtime files:
 
 - `~/.config/luxafor-status/statuses.conf` — the user's statuses
   (`id | color | label`) and settings (`key = value`: `default-status`,
-  `call-status`, `timer-shortcuts`, `theme`). `luxafor-toggle` and `luxafor-tray` both parse the statuses
+  `call-status`, `call-apps`, `lock-status`, `dnd-statuses`, `timer-shortcuts`,
+  `brightness`, `theme`). `luxafor-toggle` and `luxafor-tray` both parse the statuses
   and must stay in sync if the format changes; other tools read settings with
   `luxafor-toggle --setting <key>`.
-- `~/.config/luxafor-status/callwatch.conf` — optional call detection
-  settings (`apps`, `enabled`; `status` is the legacy call status).
+- `~/.cache/luxafor-dnd` — while the tray has silenced notifications: the
+  user's own do-not-disturb setting, put back afterwards (also after a crash).
 - `~/.cache/luxafor-state` — the current status id. The tray icon polls it
   (and the config file's modification time) every second, so any tool that
   calls `luxafor-toggle` keeps the tray in sync.
@@ -130,6 +132,21 @@ od -An -tx1 /tmp/lx/dev/hidraw0     # 00 01 ff ff a5 00 00 00 00
 
 To support another model, add its `vendor:product` ID to `IDS` in
 `bin/luxafor-light` and to `udev/70-luxafor-status.rules`.
+
+## Translations
+
+Messages use gettext (domain `luxafor-status`): `_()` in the Python scripts,
+`t` / `tf` (printf format) in the shell scripts — one call per line start,
+so `xgettext` sees it.
+
+- Add a language: `msginit -i po/luxafor-status.pot -l de -o po/de.po`, translate,
+  open a pull request.
+- After changing messages: `po/update-pot.sh` (CI checks the template is up to date).
+- Try it: `po/build.sh /tmp/locale && LUXAFOR_LOCALEDIR=/tmp/locale LANGUAGE=de luxafor-panel`
+  (shell scripts also need a matching locale, e.g. `LC_ALL=de_DE.UTF-8`).
+
+The names of the shipped statuses (`share/statuses.conf`) are translated
+until the user has statuses of their own.
 
 ## Code of conduct
 

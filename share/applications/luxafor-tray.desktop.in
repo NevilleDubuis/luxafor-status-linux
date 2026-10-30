@@ -2,6 +2,7 @@
 Type=Application
 Name=Luxafor Tray
 Comment=Shows the Luxafor status in the system tray
+Comment[fr]=Affiche le statut Luxafor dans la zone de notification
 Exec=@BINDIR@/luxafor-tray
 Icon=luxafor-status
 Terminal=false

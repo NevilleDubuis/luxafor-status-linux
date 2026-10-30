@@ -1,11 +1,15 @@
 [Desktop Entry]
 Type=Application
 Name=Luxafor Panel
+Name[fr]=Panneau Luxafor
 GenericName=Status light
+GenericName[fr]=Lampe de statut
 Comment=Choose the Luxafor light status, optionally for a while
+Comment[fr]=Choisir le statut de la lampe Luxafor, éventuellement pour un moment
 Exec=@BINDIR@/luxafor-panel
 Icon=luxafor-status
 Terminal=false
 Categories=Utility;
 Keywords=luxafor;busylight;status;timer;
+Keywords[fr]=luxafor;busylight;statut;minuteur;
 StartupNotify=false

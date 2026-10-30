@@ -9,7 +9,11 @@ trap 'rm -rf "$TMP"' EXIT
 
 PASS=0; FAIL=0
 ok()   { PASS=$((PASS + 1)); printf '  \033[32m✓\033[0m %s\n' "$1"; }
-fail() { FAIL=$((FAIL + 1)); printf '  \033[31m✗\033[0m %s\n' "$1"; [ -n "${2:-}" ] && printf '      %s\n' "$2"; }
+fail() {
+    FAIL=$((FAIL + 1)); printf '  \033[31m✗\033[0m %s\n' "$1"; [ -n "${2:-}" ] && printf '      %s\n' "$2"
+    # readable in the CI summary
+    if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::error title=Test failed::$1: ${2:-}"; fi
+}
 eq()   { if [ "$2" = "$3" ]; then ok "$1"; else fail "$1" "expected [$3], got [$2]"; fi; }
 
 # Fake devices: a mouse receiver (must be left alone) and two Luxafor lights.
@@ -22,6 +26,9 @@ fake_hidraw hidraw0 0003:0000046D:0000C52B "Logitech USB Receiver"
 fake_hidraw hidraw1 0003:000004D8:0000F372 "Microchip Technology Inc. LUXAFOR ORB"
 fake_hidraw hidraw2 0003:000004D8:0000F372 "Microchip Technology Inc. LUXAFOR FLAG"
 
+# Messages in English, whatever the machine's language (translations are
+# tested at the end).
+export LC_ALL=C.UTF-8 LANGUAGE=en
 export LUXAFOR_SYSFS="$TMP/sys" LUXAFOR_DEV="$TMP/dev"
 export XDG_RUNTIME_DIR="$TMP/run"
 export HOME="$TMP/home" XDG_DATA_HOME="$TMP/data" XDG_CONFIG_HOME="$TMP/config" \
@@ -142,6 +149,21 @@ eq "timer expired while logged out → default status at login" "$("$TOGGLE" --c
 eq "--cancel-timer keeps the status" "$("$TOGGLE" --current) $("$TOGGLE" --timer)" "focus No timer."
 printf 'default-status = pipe\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
 eq "default-status setting" "$("$TOGGLE" --setting default-status)" pipe
+eq "brightness defaults to 100" "$("$TOGGLE" --setting brightness)" 100
+eq "lock-status defaults to off" "$("$TOGGLE" --setting lock-status)" off
+eq "dnd-statuses default to none" "$("$TOGGLE" --setting dnd-statuses)" ""
+eq "call-apps default to the usual browsers" "$("$TOGGLE" --setting call-apps | cut -d' ' -f1-2)" "firefox chrome"
+printf 'brightness = 40\nlock-status = pipe\ndnd-statuses = focus, nope pipe\ncall-apps = firefox teams\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+eq "brightness setting" "$("$TOGGLE" --setting brightness)" 40
+eq "lock-status setting" "$("$TOGGLE" --setting lock-status)" pipe
+eq "dnd-statuses: valid ids kept" "$("$TOGGLE" --setting dnd-statuses)" "focus pipe"
+eq "call-apps setting" "$("$TOGGLE" --setting call-apps)" "firefox teams"
+"$TOGGLE" focus >/dev/null 2>&1
+eq "brightness 40 % → colors scaled" "$(bytes hidraw1)" "00 01 ff 00 00 66 00 00 00"
+printf 'brightness = 300\nlock-status = nope\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+eq "invalid brightness → 100" "$("$TOGGLE" --setting brightness)" 100
+eq "invalid lock-status → off" "$("$TOGGLE" --setting lock-status)" off
+printf 'brightness = 100\nlock-status =\ndnd-statuses =\ncall-apps =\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
 eq "settings lines are not statuses" "$("$TOGGLE" --list 2>/dev/null | awk '{print $1}' | paste -sd' ')" "dispo focus pipe off"
 eq "timer shortcuts default: first non-default status, 30 min and 1 h" "$("$TOGGLE" --setting timer-shortcuts | paste -sd,)" "dispo 30,dispo 60"
 printf 'timer-shortcuts = focus 1h30, nope 30, focus soon, pipe 15\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
@@ -176,7 +198,7 @@ stop_watch() {
     exec 3>&-
 }
 export PATH="$TMP/fakebin:$PATH" LUXAFOR_CALL_END_DELAY=1
-printf 'status = focus   # blue during calls\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
+printf 'call-status = focus   # blue during calls\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
 
 stream 41 "Audio Recorder" gnome-sound-recorder > "$TMP/streams"
 eq "--check ignores non-browser apps" "$("$WATCH" --check | tail -1)" "→ Not a call."
@@ -209,11 +231,19 @@ stream 60 Firefox firefox > "$TMP/streams"; event new 60
 : > "$TMP/streams"; event remove 60; sleep 1.5
 eq "status changed during the call is kept" "$("$TOGGLE" --current)" pipe
 
+printf 'call-status = none\n' >> "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+"$TOGGLE" dispo >/dev/null 2>&1
+stream 61 Firefox firefox > "$TMP/streams"; event new 61
+eq "call-status = none → status left alone (read at each call)" "$("$TOGGLE" --current)" dispo
+: > "$TMP/streams"; event remove 61; sleep 1.5
 stop_watch
-printf 'status = nope\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
-"$WATCH" 2>/dev/null; eq "unknown call status exits 1" "$?" 1
-printf 'enabled = no\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
-"$WATCH" 2>/dev/null; eq "enabled = no exits cleanly" "$?" 0
+printf 'status = focus\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
+exec 3<>"$TMP/events"
+"$WATCH" 2>"$TMP/old.err" & WATCH_PID=$!
+sleep 0.5
+eq "old callwatch.conf → says it's no longer read" "$(grep -c 'no longer read' "$TMP/old.err")" 1
+stop_watch
+rm -f "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"
 
 
 echo "luxafor-callwatch with settings and timers"
@@ -224,14 +254,13 @@ tel   | purple  | Au téléphone
 default-status = dispo
 call-status    = tel
 CONF
-printf 'status = focus\n' > "$XDG_CONFIG_HOME/luxafor-status/callwatch.conf"   # legacy, overridden
 : > "$TMP/streams"
 exec 3<>"$TMP/events"
 "$WATCH" 2>/dev/null & WATCH_PID=$!
 sleep 0.5
 "$TOGGLE" focus --for 30 >/dev/null 2>&1
 stream 80 Firefox firefox > "$TMP/streams"; event new 80
-eq "call-status from statuses.conf wins" "$("$TOGGLE" --current)" tel
+eq "call-status from statuses.conf" "$("$TOGGLE" --current)" tel
 eq "a call doesn't cancel the timer" "$([ -f "$TIMERF" ] && echo yes || echo no)" yes
 : > "$TMP/streams"; event remove 80; sleep 1.5
 eq "call ends, timer still running → back to the timed status" "$("$TOGGLE" --current)" focus
@@ -244,6 +273,24 @@ eq "timer ends during a call → call status kept" "$("$TOGGLE" --current)" tel
 eq "call ends after the timer → default status" "$("$TOGGLE" --current)" dispo
 stop_watch
 "$TOGGLE" --cancel-timer
+
+echo "translations"
+FR_LOCALE="$(locale -a 2>/dev/null | grep -iE '^fr_[A-Z]{2}\.utf-?8$' | head -1)"
+if command -v msgfmt >/dev/null 2>&1 && command -v gettext >/dev/null 2>&1 && [ -n "$FR_LOCALE" ]; then
+    "$ROOT/po/build.sh" "$TMP/locale"
+    fr() { LUXAFOR_LOCALEDIR="$TMP/locale" LC_ALL="$FR_LOCALE" LANGUAGE=fr "$@"; }
+    rm -f "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"   # back to the shipped statuses
+    eq "shipped status names translated" "$(fr "$TOGGLE" --list | awk '{print $3, $4}' | paste -sd,)" "Disponible ,Occupé ,En appel,Éteint "
+    "$TOGGLE" busy --for 90 >/dev/null 2>&1
+    eq "timer in French" "$(fr "$TOGGLE" --timer | sed 's/[0-9][0-9]:[0-9][0-9]/HH:MM/')" "Occupé jusqu’à HH:MM (encore 1 h 30), puis Disponible"
+    "$TOGGLE" --cancel-timer
+    eq "driver messages in French" "$(LUXAFOR_IDS=dead:beef fr "$LIGHT" red 2>&1)" "luxafor-light: aucune lampe Luxafor trouvée — est-elle branchée ?"
+    mkdir -p "$XDG_CONFIG_HOME/luxafor-status"
+    printf 'busy | red | Busy\n' > "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
+    eq "the user's own status names are never translated" "$(fr "$TOGGLE" --list | head -1 | awk '{print $3}')" "Busy"
+else
+    echo "  (skipped: needs msgfmt, gettext and a French locale)"
+fi
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
