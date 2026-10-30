@@ -60,6 +60,12 @@ OFF_COLOR = "#9e9e9e"
 # (minutes, label); None = no timer
 DURATIONS = [(None, "∞"), (15, None), (30, None), (60, None), (120, None)]  # labels: human_minutes
 CUSTOM_DEFAULT = 45
+# How the light shows a status (4th field of statuses.conf)
+EFFECTS = [
+    ("steady", _("Steady")), ("blink-slow", _("Blink slowly")),
+    ("blink", _("Blink")), ("blink-fast", _("Blink fast")),
+]
+EFFECT_IDS = [effect for effect, _label in EFFECTS]
 
 CSS = b"""
 .lx-panel { padding: 14px; }
@@ -70,6 +76,10 @@ CSS = b"""
 .lx-status.lx-current { box-shadow: inset 0 0 0 2px @theme_selected_bg_color; font-weight: bold; }
 .lx-hint { font-size: smaller; opacity: 0.55; }
 .lx-switcher { margin-bottom: 6px; }
+@keyframes lx-blink { 0% { opacity: 1; } 49% { opacity: 1; } 50% { opacity: 0.15; } 100% { opacity: 0.15; } }
+.lx-blink-slow { animation: lx-blink 1.6s infinite; }
+.lx-blink { animation: lx-blink 0.9s infinite; }
+.lx-blink-fast { animation: lx-blink 0.4s infinite; }
 """
 
 
@@ -93,6 +103,16 @@ def load_statuses():
         label = parts[2].strip() if len(parts) > 2 else sid
         statuses.append((sid, OFF_COLOR if sid == "off" else color, label))
     return statuses or [("off", OFF_COLOR, "Off")]
+
+
+def load_effects():
+    """{id: effect} from `luxafor-toggle --list-effects` (steady, blink…)."""
+    effects = {}
+    for line in toggle_output("--list-effects").splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[1] in EFFECT_IDS:
+            effects[parts[0]] = parts[1]
+    return effects
 
 
 def read_timer():
@@ -194,11 +214,14 @@ def start_background(spawn=None):
     return started
 
 
-def dot(color, size="large"):
+def dot(color, size="large", effect="steady"):
+    """A colored dot; it blinks like the light for a blinking status."""
     label = Gtk.Label()
     label.set_markup(
         f'<span foreground="{GLib.markup_escape_text(color)}" size="{size}">●</span>'
     )
+    if effect != "steady":
+        label.get_style_context().add_class(f"lx-{effect}")
     return label
 
 
@@ -211,6 +234,7 @@ class Panel(Gtk.ApplicationWindow):
             [TOGGLE, *args], stdin=subprocess.DEVNULL, start_new_session=True
         ))
         self.statuses = load_statuses()
+        self.effects = load_effects()
         self.current = (toggle_output("--current").strip() or "off")
         self.minutes = None
 
@@ -310,7 +334,7 @@ class Panel(Gtk.ApplicationWindow):
         for n, (sid, color, label) in enumerate(self.statuses):
             button = Gtk.Button()
             content = Gtk.Box(spacing=8)
-            content.pack_start(dot(color), False, False, 0)
+            content.pack_start(dot(color, effect=self.effects.get(sid, "steady")), False, False, 0)
             name = Gtk.Label(label=label, xalign=0)
             name.set_ellipsize(Pango.EllipsizeMode.END)
             content.pack_start(name, True, True, 0)
@@ -347,6 +371,7 @@ class Panel(Gtk.ApplicationWindow):
     def rebuild_status_page(self):
         """After the settings are saved: statuses may have changed."""
         self.statuses = load_statuses()
+        self.effects = load_effects()
         old = self.stack.get_child_by_name("status")
         self.stack.remove(old)
         old.destroy()
@@ -450,8 +475,9 @@ THEMES = [("auto", _("Follow the desktop")), ("light", _("Light")), ("dark", _("
 
 def read_settings():
     """What the settings page edits, as luxafor-toggle sees it."""
-    statuses = [s for s in load_statuses() if s[0] != "off"]
-    ids = [s[0] for s in statuses]
+    effects = load_effects()
+    statuses = [(sid, color, label, effects.get(sid, "steady"))
+                for sid, color, label in load_statuses() if sid != "off"]
     shortcuts = []
     for line in toggle_output("--setting", "timer-shortcuts").splitlines():
         try:
@@ -511,13 +537,17 @@ def write_settings(settings, path=CONF):
     lines = [
         "# luxafor-status — status configuration",
         "# Edited with Luxafor Panel → Settings. Hand edits work too:",
-        "# one status per line, \"id | color | label\", then settings as",
+        "# one status per line, \"id | color | label\" (add \"| blink\",",
+        "# \"| blink-slow\" or \"| blink-fast\" to make it blink), then settings as",
         "# \"key = value\" — see: man luxafor-toggle",
         "",
     ]
     width = max([len(s[0]) for s in settings["statuses"]] + [4])
-    for sid, color, label in settings["statuses"]:
-        lines.append(f"{sid.ljust(width)} | {color.ljust(8)} | {label}")
+    for sid, color, label, effect in settings["statuses"]:
+        line = f"{sid.ljust(width)} | {color.ljust(8)} | {label}"
+        if effect != "steady":
+            line += f" | {effect}"
+        lines.append(line)
     shortcuts = ", ".join(f"{sid} {minutes}" for sid, minutes in settings["timer-shortcuts"])
     lines += [
         "",
@@ -563,26 +593,34 @@ def icon_button(icon, tooltip, callback):
 class StatusRow(Gtk.Box):
     """One editable status: color, label, move up/down, delete."""
 
-    def __init__(self, page, sid, color, label):
+    def __init__(self, page, sid, color, label, effect="steady"):
         super().__init__(spacing=4)
         self.page, self.sid, self.original_color = page, sid, color
         self.color = Gtk.ColorButton.new_with_rgba(rgba(color))
         self.color.set_title(_("Color of “{status}”").format(status=label))
         self.color.connect("color-set", lambda _b: page.changed())
         self.label = Gtk.Entry(text=label)
-        self.label.set_width_chars(22)
+        self.label.set_width_chars(16)
         self.label.connect("changed", lambda _e: page.changed(statuses=True))
+        self.effect = Gtk.ComboBoxText()
+        for value, text in EFFECTS:
+            self.effect.append(value, text)
+        self.effect.set_active_id(effect if effect in EFFECT_IDS else "steady")
+        self.effect.set_tooltip_text(_("How the light shows this status"))
+        self.effect.connect("changed", lambda _c: page.changed())
         self.pack_start(self.color, False, False, 0)
         self.pack_start(self.label, True, True, 0)
+        self.pack_start(self.effect, False, False, 0)
         self.pack_start(icon_button("go-up-symbolic", _("Move up"), lambda: page.move(self, -1)), False, False, 0)
         self.pack_start(icon_button("go-down-symbolic", _("Move down"), lambda: page.move(self, 1)), False, False, 0)
         self.pack_start(icon_button("user-trash-symbolic", _("Delete"), lambda: page.remove(self)), False, False, 0)
 
     def value(self):
-        """(id or None for a new status, color, label)."""
+        """(id or None for a new status, color, label, effect)."""
         chosen = self.color.get_rgba()
         color = self.original_color if chosen.equal(rgba(self.original_color)) else to_hex(chosen)
-        return self.sid, color, " ".join(self.label.get_text().split())
+        label = " ".join(self.label.get_text().split())
+        return self.sid, color, label, self.effect.get_active_id() or "steady"
 
 
 class ShortcutRow(Gtk.Box):
@@ -712,8 +750,8 @@ class SettingsPage(Gtk.Box):
             child.destroy()
         for combo in (self.default_combo, self.call_combo, self.lock_combo):
             combo.remove_all()  # choices come back from the loaded settings
-        for sid, color, label in settings["statuses"]:
-            self.rows_box.pack_start(StatusRow(self, sid, color, label), False, False, 0)
+        for sid, color, label, effect in settings["statuses"]:
+            self.rows_box.pack_start(StatusRow(self, sid, color, label, effect), False, False, 0)
         for sid, minutes in settings["timer-shortcuts"]:
             self.shortcuts_box.pack_start(ShortcutRow(self, sid, minutes), False, False, 0)
         self.theme_combo.set_active_id(settings["theme"])
@@ -858,12 +896,12 @@ class SettingsPage(Gtk.Box):
         taken = {row.sid for row in self.rows() if row.sid}
         keys, statuses = {}, []
         for row in self.rows():
-            sid, color, label = row.value()
+            sid, color, label, effect = row.value()
             if sid is None:
                 sid = make_id(label, taken)
                 taken.add(sid)
             keys[row.sid or f"new:{id(row)}"] = sid
-            statuses.append((sid, color, label))
+            statuses.append((sid, color, label, effect))
         return {
             "statuses": statuses,
             "default-status": keys.get(self.default_combo.get_active_id(), statuses[0][0]),

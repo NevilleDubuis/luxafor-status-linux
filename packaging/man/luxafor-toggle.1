@@ -49,6 +49,12 @@ Show the settings in use.
 .B \-\-list
 List the configured statuses.
 .TP
+.B \-\-list\-effects
+Print
+.IR "id effect"
+for each status (see
+.BR CONFIGURATION ).
+.TP
 .B \-\-current
 Print the id of the current status.
 .TP
@@ -65,13 +71,15 @@ Regenerate the status icons and the launcher's right-click actions after
 editing the configuration by hand.
 .SH CONFIGURATION
 One status per line, as
-.IR "id " | " color " | " label" :
+.IR "id " | " color " | " label" ,
+optionally followed by
+.RI "| " effect :
 .PP
 .nf
 .RS
 available | green   | Available
 busy      | red     | Busy
-focus     | #0000ff | Focus \(em do not disturb
+focus     | #0000ff | Focus \(em do not disturb | blink\-slow
 .RE
 .fi
 .PP
@@ -86,6 +94,12 @@ is anything
 accepts.
 .I label
 is shown in menus and notifications.
+.I effect
+is
+.B steady
+(the default),
+.BR blink ", " blink\-slow " or " blink\-fast :
+the light then blinks by itself until the status changes.
 .PP
 Settings are
 .IR "key " = " value"

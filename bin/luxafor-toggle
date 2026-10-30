@@ -8,6 +8,7 @@
 #   luxafor-toggle --timer          show the running timer
 #   luxafor-toggle --cancel-timer   stop the timer, keep the current status
 #   luxafor-toggle --list           list configured statuses
+#   luxafor-toggle --list-effects   print "<id> <effect>" for each status
 #   luxafor-toggle --settings       show the settings (default and call status)
 #   luxafor-toggle --current        print the current status id
 #   luxafor-toggle --apply          show the current status on the light again
@@ -76,16 +77,20 @@ notify() {
 
 die() { echo "luxafor-toggle: $1" >&2; notify "$1"; exit "${2:-1}"; }
 
-# Loads statuses into IDS / COLORS / LABELS (parallel arrays), and the
-# settings ("key = value" lines) into SET_DEFAULT / SET_CALL.
+# Effects a status can have (4th field): steady (default) or blinking.
+EFFECTS_ALL="steady blink blink-slow blink-fast"
+is_effect() { [[ " $EFFECTS_ALL " == *" $1 "* ]]; }
+
+# Loads statuses into IDS / COLORS / LABELS / EFFECTS (parallel arrays), and
+# the settings ("key = value" lines) into SET_DEFAULT / SET_CALL….
 load_statuses() {
-    IDS=(); COLORS=(); LABELS=(); SET_DEFAULT=""; SET_CALL=""; SET_THEME=""; SET_SHORTCUTS="-"
+    IDS=(); COLORS=(); LABELS=(); EFFECTS=(); SET_DEFAULT=""; SET_CALL=""; SET_THEME=""; SET_SHORTCUTS="-"
     SET_LOCK=""; SET_DND=""; SET_BRIGHTNESS=""; SET_APPS=""
-    local file="$CONF" line id color label key value n=0
+    local file="$CONF" line id color label effect key value n=0
     local own=1
     [ -f "$file" ] || { file="$DEFAULT_CONF"; own=0; }
     if [ ! -f "$file" ]; then
-        IDS=(available busy call); COLORS=(green red yellow)
+        IDS=(available busy call); COLORS=(green red yellow); EFFECTS=(steady steady steady)
         LABELS=("$(t Available)" "$(t Busy)" "$(t "On a call")"); resolve_settings; return
     fi
     while IFS= read -r line || [ -n "$line" ]; do
@@ -114,10 +119,16 @@ load_statuses() {
             [ "$VERBOSE" -eq 1 ] && echo "luxafor-toggle: ignoring invalid line $n in $file: $line" >&2
             continue
         fi
+        # "id | color | label | effect": the last field is the effect if it
+        # is one (labels may contain "|" themselves).
+        effect=steady
+        if [[ "$label" == *"|"* ]] && is_effect "$(trim "${label##*|}")"; then
+            effect="$(trim "${label##*|}")"; label="$(trim "${label%|*}")"
+        fi
         label="${label:-$id}"
         # Shipped defaults (no statuses of the user's own yet): translated.
         [ "$own" -eq 1 ] || label="$(t "$label")"
-        IDS+=("$id"); COLORS+=("$color"); LABELS+=("$label")
+        IDS+=("$id"); COLORS+=("$color"); LABELS+=("$label"); EFFECTS+=("$effect")
     done < "$file"
     [ "${#IDS[@]}" -gt 0 ] || die "no valid status in $file"
     resolve_settings
@@ -393,7 +404,11 @@ light() {
         ERR="$("$LIGHT" off 2>&1)"
     else
         i="$(index_of "$1")"
-        ERR="$(LUXAFOR_BRIGHTNESS="$BRIGHTNESS" "$LIGHT" "${COLORS[$i]}" 2>&1)"
+        if [ "${EFFECTS[$i]}" = steady ]; then
+            ERR="$(LUXAFOR_BRIGHTNESS="$BRIGHTNESS" "$LIGHT" "${COLORS[$i]}" 2>&1)"
+        else
+            ERR="$(LUXAFOR_BRIGHTNESS="$BRIGHTNESS" "$LIGHT" "${COLORS[$i]}" "${EFFECTS[$i]}" 2>&1)"
+        fi
     fi
 }
 
@@ -421,7 +436,7 @@ set_status() {
 
 case "${1:-}" in
     -h|--help)
-        sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     --edit)
         edit_config "${2:-}"; exit 0 ;;
 esac
@@ -437,6 +452,9 @@ while [ $# -gt 0 ]; do
         --list)
             for i in "${!IDS[@]}"; do printf '%-12s %-10s %s\n' "${IDS[$i]}" "${COLORS[$i]}" "${LABELS[$i]}"; done
             printf '%-12s %-10s %s\n' off - "$(t Off)"
+            exit 0 ;;
+        --list-effects)
+            for i in "${!IDS[@]}"; do printf '%s %s\n' "${IDS[$i]}" "${EFFECTS[$i]}"; done
             exit 0 ;;
         --current)
             cat "$STATE" 2>/dev/null || echo off; exit 0 ;;

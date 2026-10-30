@@ -122,6 +122,9 @@ def config_mtime():
         return None
 
 
+EFFECTS = ("steady", "blink", "blink-slow", "blink-fast")
+
+
 def load_statuses():
     """Returns [(id, color, label), …] — same rules as luxafor-toggle."""
     statuses = []
@@ -137,7 +140,13 @@ def load_statuses():
                 sid, color = parts[0], parts[1]
                 if not ID_RE.match(sid) or sid == "off":
                     continue
-                label = parts[2] if len(parts) > 2 and parts[2] else sid
+                label = parts[2] if len(parts) > 2 else ""
+                # "id | color | label | effect": the effect (blinking…) is
+                # luxafor-toggle's business; drop it from the label.
+                head, sep, last = label.rpartition("|")
+                if sep and last.strip() in EFFECTS:
+                    label = head.strip()
+                label = label or sid
                 statuses.append((sid, color, label))
     except OSError:
         pass
