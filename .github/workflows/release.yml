@@ -52,3 +52,31 @@ jobs:
           gh release create "$GITHUB_REF_NAME" dist/*.deb \
             --title "$GITHUB_REF_NAME" \
             --generate-notes "${PRERELEASE[@]}"
+
+      - name: Update the apt repository (GitHub Pages)
+        env:
+          APT_SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$APT_SIGNING_KEY" ]; then
+            echo "::notice::APT_SIGNING_KEY is not set: the apt repository was not updated (see CONTRIBUTING.md)"
+            exit 0
+          fi
+          sudo apt-get install -y -qq apt-utils
+          GNUPGHOME="$(mktemp -d)"
+          export GNUPGHOME
+          echo "$APT_SIGNING_KEY" | gpg --batch --quiet --import
+          url="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code --heads "$url" gh-pages >/dev/null; then
+            git clone --quiet --depth 1 --branch gh-pages "$url" repo
+          else
+            git init --quiet -b gh-pages repo
+            git -C repo remote add origin "$url"
+          fi
+          packaging/update-apt-repo.sh repo dist/*.deb
+          cd repo
+          git add -A
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit --quiet -m "luxafor-status ${GITHUB_REF_NAME#v}"
+          git push --quiet origin gh-pages
