@@ -60,7 +60,9 @@ fn main() {
                 // Releases are built with the version of their tag.
                 println!(
                     "luxafor-status {}",
-                    option_env!("LUXAFOR_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
+                    option_env!("LUXAFOR_VERSION")
+                        .map(|v| v.trim_start_matches('v'))
+                        .unwrap_or(env!("CARGO_PKG_VERSION"))
                 );
                 return;
             }
