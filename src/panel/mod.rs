@@ -428,7 +428,7 @@ impl Panel {
         ui.add_space(6.0);
         ui.label(
             RichText::new(tr("Pick a duration, then a status · Esc to close"))
-                .small()
+                .size(12.0)
                 .weak(),
         );
     }
