@@ -1,0 +1,30 @@
+[package]
+name = "luxafor-status"
+version = "2.0.0-alpha.0"
+edition = "2021"
+rust-version = "1.89"
+description = "Control a Luxafor status light from your desktop: tray icon, panel, timers, call detection"
+license = "MIT"
+repository = "https://github.com/NevilleDubuis/luxafor-status-linux"
+publish = false
+
+[[bin]]
+name = "luxafor-status"
+path = "src/main.rs"
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+eframe = { version = "0.37", default-features = false, features = ["clipboard", "default_fonts", "glow", "wayland", "x11"] }
+tray-icon = "0.26"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
+[target.'cfg(windows)'.dependencies]
+hidapi = "2.6"
+winreg = "0.56"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
