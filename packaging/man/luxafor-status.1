@@ -1,0 +1,44 @@
+.TH LUXAFOR-STATUS 1 "" "luxafor-status" "User Commands"
+.SH NAME
+luxafor-status \- control a Luxafor status light from the desktop
+.SH SYNOPSIS
+.B luxafor-status
+.br
+.B luxafor-status
+.I command
+.RI [ options ]
+.SH DESCRIPTION
+.B luxafor-status
+is one program with several commands, also installed under their own
+names:
+.TP
+.BR toggle ", " luxafor-toggle (1)
+set or cycle the status, timers, settings;
+.TP
+.BR light ", " luxafor-light (1)
+drive the light directly;
+.TP
+.BR tray ", " luxafor-tray (1)
+the tray icon, started at login;
+.TP
+.BR panel ", " luxafor-panel (1)
+the panel \(em also what
+.B luxafor-status
+alone opens;
+.TP
+.BR callwatch ", " luxafor-callwatch (1)
+call detection on its own.
+.PP
+Any other argument is passed to
+.BR toggle :
+.B luxafor-status busy \-\-for 30
+is
+.BR "luxafor-toggle busy \-\-for 30" .
+.SH OPTIONS
+.TP
+.B \-\-version
+Print the version.
+.SH SEE ALSO
+.BR luxafor-toggle (1),
+.BR luxafor-panel (1),
+.BR luxafor-tray (1)

@@ -1,367 +1,333 @@
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
-# This file is distributed under the same license as the luxafor-status package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
-#, fuzzy
+# Messages of luxafor-status.
+# This file is distributed under the same license as the luxafor-status package (MIT).
 msgid ""
 msgstr ""
 "Project-Id-Version: luxafor-status\n"
-"Report-Msgid-Bugs-To: https://github.com/NevilleDubuis/luxafor-status-linux/"
-"issues\n"
-"POT-Creation-Date: 2026-10-30 16:21+0100\n"
-"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
-"Language-Team: LANGUAGE <LL@li.org>\n"
-"Language: \n"
+"Report-Msgid-Bugs-To: https://github.com/NevilleDubuis/luxafor-status-linux/issues\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: bin/luxafor-panel:65
-msgid "Steady"
+#: src/calls.rs:26
+msgid "Luxafor call detection"
 msgstr ""
 
-#: bin/luxafor-panel:65
-msgid "Blink slowly"
+#: src/calls.rs:234
+msgid "callwatch.conf is no longer read: set the call status and the watched apps in Luxafor Panel → Settings (call-status, call-apps in statuses.conf)"
 msgstr ""
 
-#: bin/luxafor-panel:66
-msgid "Blink"
-msgstr ""
-
-#: bin/luxafor-panel:66
-msgid "Blink fast"
-msgstr ""
-
-#: bin/luxafor-panel:129 bin/luxafor-tray:282
-#, python-brace-format
-msgid "{minutes} min"
-msgstr ""
-
-#: bin/luxafor-panel:132 bin/luxafor-tray:285
-#, python-brace-format
-msgid "{hours} h"
-msgstr ""
-
-#: bin/luxafor-panel:133 bin/luxafor-tray:286
-#, python-brace-format
-msgid "{hours} h {minutes:02d}"
-msgstr ""
-
-#: bin/luxafor-panel:261 bin/luxafor-panel:379
-msgid "Status"
-msgstr ""
-
-#: bin/luxafor-panel:273
-msgid "Settings"
-msgstr ""
-
-#: bin/luxafor-panel:293 bin/luxafor-tray:488
-msgid "Cancel timer"
-msgstr ""
-
-#: bin/luxafor-panel:301
-msgid "1 · DURATION"
-msgstr ""
-
-#: bin/luxafor-panel:309
-msgid "Custom duration"
-msgstr ""
-
-#: bin/luxafor-panel:317 bin/luxafor-panel:640
-msgid "min"
-msgstr ""
-
-#: bin/luxafor-panel:331
-msgid "2 · STATUS"
-msgstr ""
-
-#: bin/luxafor-panel:357
-msgid "Pick a duration, then a status · Esc to close"
-msgstr ""
-
-#: bin/luxafor-panel:409
-#, python-brace-format
-msgid "until {time} · {left} left, then {status}"
-msgstr ""
-
-#: bin/luxafor-panel:415
-msgid "No timer"
-msgstr ""
-
-#: bin/luxafor-panel:470
-msgid "Don't change"
-msgstr ""
-
-#: bin/luxafor-panel:471
-msgid "Light off"
-msgstr ""
-
-#: bin/luxafor-panel:473
-msgid "Follow the desktop"
-msgstr ""
-
-#: bin/luxafor-panel:473
-msgid "Light"
-msgstr ""
-
-#: bin/luxafor-panel:473
-msgid "Dark"
-msgstr ""
-
-#: bin/luxafor-panel:600
-#, python-brace-format
-msgid "Color of “{status}”"
-msgstr ""
-
-#: bin/luxafor-panel:609
-msgid "How the light shows this status"
-msgstr ""
-
-#: bin/luxafor-panel:614
-msgid "Move up"
-msgstr ""
-
-#: bin/luxafor-panel:615
-msgid "Move down"
-msgstr ""
-
-#: bin/luxafor-panel:616 bin/luxafor-panel:641
-msgid "Delete"
-msgstr ""
-
-#: bin/luxafor-panel:638
-msgid "for"
-msgstr ""
-
-#: bin/luxafor-panel:655
-msgid "STATUSES"
-msgstr ""
-
-#: bin/luxafor-panel:658
-msgid "Add status"
-msgstr ""
-
-#: bin/luxafor-panel:679
-msgid "After a timer"
-msgstr ""
-
-#: bin/luxafor-panel:679
-msgid "Status to go back to when a timer ends"
-msgstr ""
-
-#: bin/luxafor-panel:680
-msgid "During calls"
-msgstr ""
-
-#: bin/luxafor-panel:680
-msgid "Status used automatically while you are in a call"
-msgstr ""
-
-#: bin/luxafor-panel:681
-msgid "Screen locked"
-msgstr ""
-
-#: bin/luxafor-panel:682
-msgid ""
-"Status while the screen is locked; the previous one comes back when you "
-"unlock"
-msgstr ""
-
-#: bin/luxafor-panel:683
-msgid "Brightness"
-msgstr ""
-
-#: bin/luxafor-panel:683
-msgid "Brightness of the light"
-msgstr ""
-
-#: bin/luxafor-panel:684
-msgid "Theme"
-msgstr ""
-
-#: bin/luxafor-panel:684
-msgid "Look of this panel"
-msgstr ""
-
-#: bin/luxafor-panel:693
-msgid "BEHAVIOR"
-msgstr ""
-
-#: bin/luxafor-panel:698
-msgid "DO NOT DISTURB"
-msgstr ""
-
-#: bin/luxafor-panel:699
-msgid "Silence desktop notifications while:"
-msgstr ""
-
-#: bin/luxafor-panel:700
-msgid "Optional: you may still want to see incoming call notifications"
-msgstr ""
-
-#: bin/luxafor-panel:710
-msgid "TIMERS IN THE TRAY MENU"
-msgstr ""
-
-#: bin/luxafor-panel:713
-msgid "Add timer"
-msgstr ""
-
-#: bin/luxafor-panel:720
-msgid "Edit the file…"
-msgstr ""
-
-#: bin/luxafor-panel:729
-msgid "Revert"
-msgstr ""
-
-#: bin/luxafor-panel:731
-msgid "Save"
-msgstr ""
-
-#: bin/luxafor-panel:782
-msgid "(no name)"
-msgstr ""
-
-#: bin/luxafor-panel:856
-msgid "Keep at least one status."
-msgstr ""
-
-#: bin/luxafor-panel:895
-msgid "Give every status a name."
-msgstr ""
-
-#: bin/luxafor-panel:927
-#, python-brace-format
-msgid "Could not save: {error}"
-msgstr ""
-
-#: bin/luxafor-panel:934
-msgid "Saved."
-msgstr ""
-
-#: bin/luxafor-tray:450 bin/luxafor-tray:504
-msgid "Off"
-msgstr ""
-
-#: bin/luxafor-tray:456
-#, python-brace-format
-msgid "{status} until {time} ({left} left)"
-msgstr ""
-
-#: bin/luxafor-tray:481
-msgid "Light not connected"
-msgstr ""
-
-#: bin/luxafor-tray:498
-#, python-brace-format
-msgid "{status} for {duration}"
-msgstr ""
-
-#: bin/luxafor-tray:500
-msgid "More…"
-msgstr ""
-
-#: bin/luxafor-tray:507
-msgid "Quit"
-msgstr ""
-
-#: bin/luxafor-tray:538
-#, python-brace-format
-msgid "{status} — light not connected"
-msgstr ""
-
-#: bin/luxafor-tray:616
-#, python-brace-format
-msgid ""
-"Light disconnected — {status} will be shown again when it's plugged back in"
-msgstr ""
-
-#: bin/luxafor-tray:627
-#, python-brace-format
-msgid "Light reconnected — {status}"
-msgstr ""
-
-#: bin/luxafor-toggle:94
-msgid "Available"
-msgstr ""
-
-#: bin/luxafor-toggle:94
-msgid "Busy"
-msgstr ""
-
-#: bin/luxafor-toggle:94
-msgid "On a call"
-msgstr ""
-
-#: bin/luxafor-toggle:272
-msgid "Change the Luxafor light status"
-msgstr ""
-
-#: bin/luxafor-toggle:279
-msgid "Open panel…"
-msgstr ""
-
-#: bin/luxafor-toggle:333
-msgid "%d min"
-msgstr ""
-
-#: bin/luxafor-toggle:335
-msgid "%d h"
-msgstr ""
-
-#: bin/luxafor-toggle:337
-msgid "%d h %02d"
-msgstr ""
-
-#: bin/luxafor-toggle:379
-msgid "Timer ended — %s"
-msgstr ""
-
-#: bin/luxafor-toggle:386
-msgid "No timer."
-msgstr ""
-
-#: bin/luxafor-toggle:391
-msgid "%s until %s (%s left), then %s\\n"
-msgstr ""
-
-#: bin/luxafor-toggle:423
-msgid "%s — light not connected"
-msgstr ""
-
-#: bin/luxafor-toggle:497
-msgid "Timer cancelled"
-msgstr ""
-
-#: bin/luxafor-toggle:541
-msgid "%s for %s — until %s"
-msgstr ""
-
-#: bin/luxafor-light:119
-msgid "no Luxafor light found — is it plugged in?"
-msgstr ""
-
-#: bin/luxafor-light:127
-msgid "cannot write to %s (permission denied? replug the light)"
-msgstr ""
-
-#: bin/luxafor-light:151
-msgid "unknown color '%s' — use a name (red, orange…) or a hex code (#ff8800)"
-msgstr ""
-
-#: bin/luxafor-light:160
-msgid "unknown effect '%s' — use: blink, blink slow, blink fast"
-msgstr ""
-
-#: bin/luxafor-callwatch:142
+#: src/calls.rs:240
 msgid "pactl not found — install it with: sudo apt install pulseaudio-utils"
 msgstr ""
 
-#: bin/luxafor-callwatch:144
-msgid ""
-"callwatch.conf is no longer read: set the call status and the watched apps "
-"in Luxafor Panel → Settings (call-status, call-apps in statuses.conf)"
+#: src/config.rs:319 src/desktop.rs:74 src/panel/mod.rs:353 src/toggle.rs:271 src/tray/mod.rs:216
+msgid "Off"
+msgstr ""
+
+#: src/config.rs:480
+msgid "Unknown status '{id}'. Available: {ids} off"
+msgstr ""
+
+#: src/desktop.rs:50
+msgid "Change the Luxafor light status"
+msgstr ""
+
+#: src/desktop.rs:61
+msgid "Open panel…"
+msgstr ""
+
+#: src/light.rs:31
+msgid "no Luxafor light found — is it plugged in?"
+msgstr ""
+
+#: src/light.rs:170
+msgid "cannot write to {path} (permission denied? replug the light)"
+msgstr ""
+
+#: src/light.rs:183 src/light.rs:186
+msgid "cannot open the light: {error}"
+msgstr ""
+
+#: src/lightcli.rs:56 src/toggle.rs:51
+msgid "unknown color '{color}' — use a name (red, orange…) or a hex code (#ff8800)"
+msgstr ""
+
+#: src/lightcli.rs:71
+msgid "unknown effect '{effect}' — use: blink, blink slow, blink fast"
+msgstr ""
+
+#: src/panel/mod.rs:48
+msgid "Steady"
+msgstr ""
+
+#: src/panel/mod.rs:49
+msgid "Blink slowly"
+msgstr ""
+
+#: src/panel/mod.rs:50
+msgid "Blink"
+msgstr ""
+
+#: src/panel/mod.rs:51
+msgid "Blink fast"
+msgstr ""
+
+#: src/panel/mod.rs:57
+msgid "Follow the desktop"
+msgstr ""
+
+#: src/panel/mod.rs:58
+msgid "Light"
+msgstr ""
+
+#: src/panel/mod.rs:59
+msgid "Dark"
+msgstr ""
+
+#: src/panel/mod.rs:281
+msgid "until {time} · {left} left, then {status}"
+msgstr ""
+
+#: src/panel/mod.rs:292
+msgid "No timer"
+msgstr ""
+
+#: src/panel/mod.rs:298 src/tray/mod.rs:194
+msgid "Cancel timer"
+msgstr ""
+
+#: src/panel/mod.rs:308
+msgid "1 · DURATION"
+msgstr ""
+
+#: src/panel/mod.rs:326 src/panel/mod.rs:582
+msgid "min"
+msgstr ""
+
+#: src/panel/mod.rs:330
+msgid "Custom duration"
+msgstr ""
+
+#: src/panel/mod.rs:335
+msgid "2 · STATUS"
+msgstr ""
+
+#: src/panel/mod.rs:430
+msgid "Pick a duration, then a status · Esc to close"
+msgstr ""
+
+#: src/panel/mod.rs:464
+msgid "STATUSES"
+msgstr ""
+
+#: src/panel/mod.rs:488
+msgid "How the light shows this status"
+msgstr ""
+
+#: src/panel/mod.rs:489
+msgid "Move up"
+msgstr ""
+
+#: src/panel/mod.rs:492
+msgid "Move down"
+msgstr ""
+
+#: src/panel/mod.rs:495 src/panel/mod.rs:583
+msgid "Delete"
+msgstr ""
+
+#: src/panel/mod.rs:511
+msgid "Add status"
+msgstr ""
+
+#: src/panel/mod.rs:517
+msgid "BEHAVIOR"
+msgstr ""
+
+#: src/panel/mod.rs:522
+msgid "After a timer"
+msgstr ""
+
+#: src/panel/mod.rs:522
+msgid "Status to go back to when a timer ends"
+msgstr ""
+
+#: src/panel/mod.rs:526
+msgid "During calls"
+msgstr ""
+
+#: src/panel/mod.rs:526
+msgid "Status used automatically while you are in a call"
+msgstr ""
+
+#: src/panel/mod.rs:530
+msgid "Screen locked"
+msgstr ""
+
+#: src/panel/mod.rs:530
+msgid "Status while the screen is locked; the previous one comes back when you unlock"
+msgstr ""
+
+#: src/panel/mod.rs:534
+msgid "Brightness"
+msgstr ""
+
+#: src/panel/mod.rs:534
+msgid "Brightness of the light"
+msgstr ""
+
+#: src/panel/mod.rs:537
+msgid "Theme"
+msgstr ""
+
+#: src/panel/mod.rs:537
+msgid "Look of this panel"
+msgstr ""
+
+#: src/panel/mod.rs:547
+msgid "DO NOT DISTURB"
+msgstr ""
+
+#: src/panel/mod.rs:548
+msgid "Silence desktop notifications while:"
+msgstr ""
+
+#: src/panel/mod.rs:549
+msgid "Optional: you may still want to see incoming call notifications"
+msgstr ""
+
+#: src/panel/mod.rs:570
+msgid "TIMERS IN THE TRAY MENU"
+msgstr ""
+
+#: src/panel/mod.rs:578
+msgid "for"
+msgstr ""
+
+#: src/panel/mod.rs:595
+msgid "Add timer"
+msgstr ""
+
+#: src/panel/mod.rs:604 src/panel/model.rs:160
+msgid "Keep at least one status."
+msgstr ""
+
+#: src/panel/mod.rs:613
+msgid "Edit the file…"
+msgstr ""
+
+#: src/panel/mod.rs:621
+msgid "Save"
+msgstr ""
+
+#: src/panel/mod.rs:627
+msgid "Revert"
+msgstr ""
+
+#: src/panel/mod.rs:649
+msgid "Could not save: {error}"
+msgstr ""
+
+#: src/panel/mod.rs:666
+msgid "Saved."
+msgstr ""
+
+#: src/panel/mod.rs:694
+msgid "Status"
+msgstr ""
+
+#: src/panel/mod.rs:695
+msgid "Settings"
+msgstr ""
+
+#: src/panel/model.rs:39
+msgid "Don't change"
+msgstr ""
+
+#: src/panel/model.rs:43
+msgid "Light off"
+msgstr ""
+
+#: src/panel/model.rs:85
+msgid "(no name)"
+msgstr ""
+
+#: src/panel/model.rs:182
+msgid "Give every status a name."
+msgstr ""
+
+#: src/state.rs:115
+msgid "{minutes} min"
+msgstr ""
+
+#: src/state.rs:117
+msgid "{hours} h"
+msgstr ""
+
+#: src/state.rs:119
+msgid "{hours} h {minutes}"
+msgstr ""
+
+#: src/toggle.rs:78 src/tray/mod.rs:267
+msgid "{status} — light not connected"
+msgstr ""
+
+#: src/toggle.rs:160
+msgid "Timer ended — {status}"
+msgstr ""
+
+#: src/toggle.rs:170
+msgid "No timer."
+msgstr ""
+
+#: src/toggle.rs:173
+msgid "{status} until {time} ({left} left), then {then}"
+msgstr ""
+
+#: src/toggle.rs:353
+msgid "Timer cancelled"
+msgstr ""
+
+#: src/toggle.rs:424
+msgid "{status} for {duration} — until {time}"
+msgstr ""
+
+#: src/tray/mod.rs:155
+msgid "{status} until {time} ({left} left)"
+msgstr ""
+
+#: src/tray/mod.rs:186
+msgid "Light not connected"
+msgstr ""
+
+#: src/tray/mod.rs:204
+msgid "{status} for {duration}"
+msgstr ""
+
+#: src/tray/mod.rs:213
+msgid "More…"
+msgstr ""
+
+#: src/tray/mod.rs:218
+msgid "Quit"
+msgstr ""
+
+#: src/tray/mod.rs:370
+msgid "Light disconnected — {status} will be shown again when it's plugged back in"
+msgstr ""
+
+#: src/tray/mod.rs:391
+msgid "Light reconnected — {status}"
+msgstr ""
+
+#: share/statuses.conf
+msgid "Available"
+msgstr ""
+
+#: share/statuses.conf
+msgid "Busy"
+msgstr ""
+
+#: share/statuses.conf
+msgid "On a call"
 msgstr ""

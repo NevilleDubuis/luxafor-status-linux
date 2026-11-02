@@ -14,10 +14,13 @@ browser tab \(em starts recording, the light switches to the call status.
 When the call ends, the previous status comes back, unless the status was
 changed by hand during the call.
 .PP
-It is started at login through
-.IR /etc/xdg/autostart/luxafor-callwatch.desktop .
+The tray icon,
+.BR luxafor-tray (1),
+does it while it runs: started on its own,
+.B luxafor-callwatch
+is only needed without the tray icon.
 .PP
-Only one runs per user: a second one leaves right away.
+Only one runs per user (the tray's included): a second one leaves right away.
 .SH OPTIONS
 .TP
 .B \-\-check
