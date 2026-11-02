@@ -2,49 +2,63 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "v2/**"]
   pull_request:
 
 permissions:
   contents: read
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  test:
-    runs-on: ubuntu-24.04
+  linux:
+    # 22.04: the package then works on Ubuntu 22.04 and later.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v5
 
       - name: Install tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq shellcheck lintian appstream desktop-file-utils gettext locales \
-            python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 \
-            xvfb dbus librsvg2-common gsettings-desktop-schemas
-          sudo locale-gen fr_CH.UTF-8   # translation tests
+          sudo apt-get install -y -qq libgtk-3-dev libayatana-appindicator3-dev \
+            shellcheck lintian appstream desktop-file-utils gettext \
+            xvfb dbus xdotool imagemagick libgl1-mesa-dri
 
-      - name: ShellCheck
-        run: shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle bin/luxafor-callwatch packaging/build-deb.sh packaging/update-apt-repo.sh tests/run.sh po/*.sh
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-${{ hashFiles('Cargo.lock') }}
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --release -- -D warnings
+
+      - name: Unit tests
+        run: cargo test --release
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Command-line tests (v1 test suite)
+        run: tests/run.sh target/release/luxafor-status
+
+      - name: Tray and panel tests (virtual display)
+        run: xvfb-run -a -s "-screen 0 1000x760x24" dbus-run-session -- tests/ui.sh target/release/luxafor-status --screenshots shots
 
       - name: Translations up to date
         run: |
           po/update-pot.sh
-          git diff --exit-code -I POT-Creation-Date po/ || { echo "::error::Run po/update-pot.sh and commit the result"; exit 1; }
+          git diff --exit-code po/ || { echo "::error::Run po/update-pot.sh and commit the result"; exit 1; }
           msgfmt --check -o /dev/null po/*.po
 
-      - name: Python
-        run: |
-          python3 -m py_compile bin/luxafor-tray bin/luxafor-panel tests/ui.py
-          # Load the tray with the real GTK / AppIndicator bindings (no main loop).
-          /usr/bin/python3 - <<'EOF'
-          src = open("bin/luxafor-tray").read().replace('if __name__ == "__main__":', "if False:")
-          exec(compile(src, "luxafor-tray", "exec"), {"__file__": "bin/luxafor-tray", "__name__": "tray"})
-          EOF
-
-      - name: Tests
-        run: tests/run.sh
-
-      - name: UI tests (panel and tray, virtual display)
-        run: xvfb-run -a dbus-run-session -- /usr/bin/python3 tests/ui.py --screenshot panel.png
+      - name: ShellCheck
+        run: shellcheck install.sh uninstall.sh packaging/*.sh tests/*.sh po/*.sh
 
       - name: Build .deb
         run: packaging/build-deb.sh "0.0.0~ci${GITHUB_RUN_NUMBER}"
@@ -68,5 +82,29 @@ jobs:
 
       - uses: actions/upload-artifact@v6
         with:
-          name: panel-screenshot
-          path: panel.png
+          name: screenshots
+          path: shots/*.png
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-${{ hashFiles('Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Unit tests
+        run: cargo test --release
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: luxafor-status-windows
+          path: target/release/luxafor-status.exe

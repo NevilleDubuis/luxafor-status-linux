@@ -1,9 +1,9 @@
 name: Release
 
-# Push a version tag to publish a release with the .deb attached:
-#   git tag v0.1.0 && git push origin v0.1.0
-# A tag with a suffix (v0.3.0-beta.1, v0.3.0-rc.1) is published as a
-# pre-release; its package version is 0.3.0~beta.1.
+# Push a version tag to publish a release with the packages attached:
+#   git tag v2.0.0 && git push origin v2.0.0
+# A tag with a suffix (v2.0.0-beta.1, v2.0.0-rc.1) is published as a
+# pre-release; its package version is 2.0.0~beta.1.
 on:
   push:
     tags: ["v*"]
@@ -11,12 +11,13 @@ on:
 permissions:
   contents: write
 
-jobs:
-  release:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
+env:
+  CARGO_TERM_COLOR: always
 
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    steps:
       - name: Check the tag
         run: |
           if ! [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
@@ -24,13 +25,28 @@ jobs:
             exit 1
           fi
 
+  deb:
+    needs: check
+    strategy:
+      matrix:
+        # 22.04: the packages then work on Ubuntu 22.04 and later.
+        os: [ubuntu-22.04, ubuntu-22.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
       - name: Install tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq lintian desktop-file-utils gettext
+          sudo apt-get install -y -qq libgtk-3-dev libayatana-appindicator3-dev lintian desktop-file-utils
+
+      - name: Build
+        run: cargo build --release
 
       - name: Tests
-        run: tests/run.sh
+        run: |
+          cargo test --release
+          tests/run.sh target/release/luxafor-status
 
       - name: Build .deb
         run: packaging/build-deb.sh "${GITHUB_REF_NAME#v}"
@@ -43,13 +59,52 @@ jobs:
           sudo apt-get install -y ./dist/*.deb
           luxafor-toggle --list
 
+      - uses: actions/upload-artifact@v6
+        with:
+          name: deb-${{ matrix.os }}
+          path: dist/*.deb
+
+  windows:
+    needs: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Tests
+        run: cargo test --release
+
+      - name: Rename
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp target/release/luxafor-status.exe "dist/luxafor-status-${GITHUB_REF_NAME#v}-windows-x64.exe"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows
+          path: dist/*.exe
+
+  publish:
+    needs: [deb, windows]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          merge-multiple: true
+
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           PRERELEASE=()
           [[ "$GITHUB_REF_NAME" == *-* ]] && PRERELEASE=(--prerelease)
-          gh release create "$GITHUB_REF_NAME" dist/*.deb \
+          gh release create "$GITHUB_REF_NAME" dist/* \
             --title "$GITHUB_REF_NAME" \
             --generate-notes "${PRERELEASE[@]}"
 
