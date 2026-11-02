@@ -737,6 +737,11 @@ static REPLACED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::
 /// it only starts at the next login otherwise), unless turned off by the
 /// user in their startup applications.
 fn start_tray() {
+    #[cfg(windows)]
+    if crate::tray::take_lock().is_some() {
+        // (released right away: the tray takes it)
+        spawn_detached(&["tray"]);
+    }
     #[cfg(target_os = "linux")]
     {
         use gtk::{gio, glib};

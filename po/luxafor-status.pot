@@ -20,11 +20,11 @@ msgstr ""
 msgid "pactl not found — install it with: sudo apt install pulseaudio-utils"
 msgstr ""
 
-#: src/config.rs:318 src/desktop.rs:74 src/panel/mod.rs:353 src/toggle.rs:271 src/tray/mod.rs:216
+#: src/config.rs:319 src/desktop.rs:74 src/panel/mod.rs:353 src/toggle.rs:271 src/tray/mod.rs:216
 msgid "Off"
 msgstr ""
 
-#: src/config.rs:479
+#: src/config.rs:480
 msgid "Unknown status '{id}'. Available: {ids} off"
 msgstr ""
 

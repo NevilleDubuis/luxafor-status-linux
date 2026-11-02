@@ -71,8 +71,9 @@ pub struct Config {
     pub call_apps: String,
 }
 
+/// Browsers (calls in a tab) and call apps.
 pub const DEFAULT_CALL_APPS: &str =
-    "firefox chrome chromium brave msedge edge vivaldi opera epiphany falkon";
+    "firefox chrome chromium brave msedge edge vivaldi opera epiphany falkon teams zoom";
 
 fn valid_id(id: &str) -> bool {
     !id.is_empty()

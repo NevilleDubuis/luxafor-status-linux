@@ -28,7 +28,13 @@ fail() {
     FAIL=$((FAIL + 1)); printf '  \033[31m✗\033[0m %s\n      %s\n' "$1" "${2:-}"
     if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::error title=Test failed::$1: ${2:-}"; fi
 }
-eq() { if [ "$2" = "$3" ]; then ok "$1"; else fail "$1" "expected [$3], got [$2]"; fi; }
+eq() { if [ "$2" = "$3" ]; then ok "$1"; else fail "$1" "expected [$3], got [$2]"; return 1; fi; }
+show_errors() {  # file: in the CI summary, where job logs may not be reachable
+    if [ -n "${GITHUB_ACTIONS:-}" ]; then
+        grep -v AT-SPI "$1" | tail -5 | while IFS= read -r l; do echo "::error title=stderr::$l"; done
+    fi
+}
+
 
 mkdir -p "$TMP/sys/class/hidraw/hidraw1/device" "$TMP/dev" "$TMP/config/luxafor-status" "$TMP/home"
 printf 'HID_ID=0003:000004D8:0000F372\nHID_NAME=Fake Luxafor\n' > "$TMP/sys/class/hidraw/hidraw1/device/uevent"
@@ -67,20 +73,21 @@ eq "light plugged back in → the status set meanwhile is shown" "$(bytes)" "00 
 "$BINARY" tray 2>/dev/null & PIDS+=($!); sleep 2
 eq "a second tray replaces the first" "$(kill -0 $TRAY 2>/dev/null && echo running || echo gone)" gone
 eq "…and keeps running" "$(kill -0 "${PIDS[-1]}" 2>/dev/null && echo running)" running
-eq "no errors" "$(grep -v AT-SPI "$TMP/tray.err" | grep -ci 'error\|panic')" 0
+eq "no errors" "$(grep -v AT-SPI "$TMP/tray.err" | grep -ci 'error\|panic')" 0 || show_errors "$TMP/tray.err"
 
 echo "luxafor-panel"
 "$BINARY" toggle busy --for 30 >/dev/null 2>&1
 "$BINARY" panel 2>"$TMP/panel.err" & PIDS+=($!); PANEL=$!
 sleep 3
 eq "opens" "$(kill -0 $PANEL 2>/dev/null && echo running)" running
+kill -0 $PANEL 2>/dev/null || show_errors "$TMP/panel.err"
 shot panel
 "$BINARY" panel --settings 2>/dev/null & PIDS+=($!); sleep 3
 eq "a second panel replaces the first" "$(kill -0 $PANEL 2>/dev/null && echo running || echo gone)" gone
 shot settings
 LUXAFOR_LANG=fr "$BINARY" panel --settings 2>/dev/null & PIDS+=($!); sleep 3
 shot settings-fr
-eq "no errors" "$(grep -v AT-SPI "$TMP/panel.err" | grep -ci 'error\|panic')" 0
+eq "no errors" "$(grep -v AT-SPI "$TMP/panel.err" | grep -ci 'error\|panic')" 0 || show_errors "$TMP/panel.err"
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

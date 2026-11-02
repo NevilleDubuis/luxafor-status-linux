@@ -540,8 +540,156 @@ pub fn main(_args: Vec<String>) -> i32 {
     0
 }
 
+/// The tray lock: one tray per user (Windows; Linux uses the D-Bus name).
+/// None: a tray is running.
 #[cfg(not(target_os = "linux"))]
+pub fn take_lock() -> Option<std::fs::File> {
+    let path = paths::lock("tray");
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(path)
+        .ok()?;
+    file.try_lock().ok()?;
+    Some(file)
+}
+
+#[cfg(windows)]
+mod win {
+    #[repr(C)]
+    pub struct Msg {
+        hwnd: isize,
+        message: u32,
+        wparam: usize,
+        lparam: isize,
+        time: u32,
+        pt: [i32; 2],
+        _private: [u8; 16],
+    }
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn PeekMessageW(msg: *mut Msg, hwnd: isize, min: u32, max: u32, remove: u32) -> i32;
+        fn TranslateMessage(msg: *const Msg) -> i32;
+        fn DispatchMessageW(msg: *const Msg) -> isize;
+        fn OpenInputDesktop(flags: u32, inherit: i32, access: u32) -> isize;
+        fn SwitchDesktop(desktop: isize) -> i32;
+        fn CloseDesktop(desktop: isize) -> i32;
+    }
+
+    /// Handles the window messages of this thread (tray icon, menu).
+    pub fn pump() {
+        const PM_REMOVE: u32 = 1;
+        let mut msg = std::mem::MaybeUninit::<Msg>::zeroed();
+        unsafe {
+            while PeekMessageW(msg.as_mut_ptr(), 0, 0, 0, PM_REMOVE) != 0 {
+                TranslateMessage(msg.as_ptr());
+                DispatchMessageW(msg.as_ptr());
+            }
+        }
+    }
+
+    /// True while the screen is locked: the input desktop can't be
+    /// switched to then.
+    pub fn screen_locked() -> bool {
+        const DESKTOP_SWITCHDESKTOP: u32 = 0x0100;
+        unsafe {
+            let desktop = OpenInputDesktop(0, 0, DESKTOP_SWITCHDESKTOP);
+            if desktop == 0 {
+                return true;
+            }
+            let switched = SwitchDesktop(desktop) != 0;
+            CloseDesktop(desktop);
+            !switched
+        }
+    }
+
+    /// Starts the tray at login (once: the user can turn it off in the
+    /// Task Manager's startup apps).
+    pub fn ensure_autostart() {
+        use winreg::enums::HKEY_CURRENT_USER;
+        let mark = crate::paths::cache_home().join("autostart-set");
+        if mark.exists() {
+            return;
+        }
+        let Ok(exe) = std::env::current_exe() else {
+            return;
+        };
+        if let Ok((key, _)) = winreg::RegKey::predef(HKEY_CURRENT_USER)
+            .create_subkey(r"Software\Microsoft\Windows\CurrentVersion\Run")
+        {
+            if key
+                .set_value("Luxafor Status", &format!("\"{}\" tray", exe.display()))
+                .is_ok()
+            {
+                let _ = std::fs::create_dir_all(crate::paths::cache_home());
+                let _ = std::fs::write(mark, "");
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
 pub fn main(_args: Vec<String>) -> i32 {
-    eprintln!("luxafor-tray: not ready on this system yet");
+    use std::time::{Duration, Instant};
+    use tray_icon::{MouseButton, MouseButtonState, TrayIconEvent};
+
+    let Some(_lock) = take_lock() else {
+        eprintln!("luxafor-tray: already running");
+        return 0;
+    };
+    let mut tray = match Tray::new() {
+        Ok(t) => t,
+        Err(e) => {
+            log(&format!("cannot start: {e}"));
+            return 1;
+        }
+    };
+    start_call_detection();
+    win::ensure_autostart();
+    let mut last_tick = Instant::now();
+    let mut locked = false;
+    loop {
+        win::pump();
+        while let Ok(event) = MenuEvent::receiver().try_recv() {
+            tray.on_menu(&event);
+        }
+        // Left click: the panel (right click: the menu).
+        while let Ok(event) = TrayIconEvent::receiver().try_recv() {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                tray.spawn(&["panel"]);
+            }
+        }
+        if tray.quit {
+            break;
+        }
+        if last_tick.elapsed() >= Duration::from_secs(1) {
+            last_tick = Instant::now();
+            if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| tray.tick())).is_err() {
+                log("error while updating (see above)");
+            }
+            let now_locked = win::screen_locked();
+            if now_locked != locked {
+                locked = now_locked;
+                tray.on_lock(locked);
+            }
+        }
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    0
+}
+
+#[cfg(not(any(target_os = "linux", windows)))]
+pub fn main(_args: Vec<String>) -> i32 {
+    eprintln!("luxafor-tray: not available on this system yet");
     1
 }
