@@ -1,6 +1,6 @@
 [package]
 name = "luxafor-status"
-version = "2.0.0-alpha.0"
+version = "2.0.0-beta.0"
 edition = "2021"
 rust-version = "1.89"
 description = "Control a Luxafor status light from your desktop: tray icon, panel, timers, call detection"

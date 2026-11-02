@@ -13,6 +13,8 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # luxafor-status --version
+  LUXAFOR_VERSION: ${{ github.ref_name }}
 
 jobs:
   check:

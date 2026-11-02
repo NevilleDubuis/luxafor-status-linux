@@ -57,7 +57,11 @@ fn main() {
                 return;
             }
             Some("--version") => {
-                println!("luxafor-status {}", env!("CARGO_PKG_VERSION"));
+                // Releases are built with the version of their tag.
+                println!(
+                    "luxafor-status {}",
+                    option_env!("LUXAFOR_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))
+                );
                 return;
             }
             // `luxafor-status busy --for 30`: a toggle command.

@@ -1590,7 +1590,7 @@ checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
 name = "luxafor-status"
-version = "2.0.0-alpha.0"
+version = "2.0.0-beta.0"
 dependencies = [
  "chrono",
  "eframe",
