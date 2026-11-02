@@ -1,10 +1,10 @@
 -----BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA512
+Hash: SHA256
 
 Architectures: all amd64 arm64 armhf i386
 Codename: stable
 Components: main
-Date: Fri, 30 Oct 2026 15:38:43 +0000
+Date: Mon, 02 Nov 2026 14:17:37 +0000
 Description: luxafor-status (stable)
 Label: luxafor-status
 Origin: luxafor-status
@@ -55,8 +55,8 @@ SHA512:
  f767c1887f410f980fe7529bacb486fccfb8135293c164c47de7498d7614b8f51cfbbfe347d8327d323f653892503657a1d3426994c50147ec0c5cb8301ce4a4             1020 main/binary-i386/Packages.gz
 -----BEGIN PGP SIGNATURE-----
 
-iHUEARYKAB0WIQTqOfcsyjpKQA813JbbwsnCvvfhqAUCauS6AwAKCRDbwsnCvvfh
-qF3+AQCB9sehZIAJJoAoDQSLrNIm0jYTy+Qum31jCSu3RcCRcQD/aQu25KPmVa98
-LVqUldzh/IWbxqRLuHpkJE51q9xeyAo=
-=dUxI
+iHUEARYIAB0WIQTqOfcsyjpKQA813JbbwsnCvvfhqAUCauibgQAKCRDbwsnCvvfh
+qCPNAP9mrRGrq8aF/TrjlQvVRT/Fov6eqrlYbhIWxhLpMAfwdwEA7O0K3SD8U2a1
+RVGKWiMLCg5ALUrQV4rdMuWO6xENbQQ=
+=hylw
 -----END PGP SIGNATURE-----

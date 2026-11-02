@@ -98,3 +98,30 @@ Description: control a Luxafor status light (ORB, Flag) from the desktop
  directly through its USB HID protocol, with no extra driver; a udev rule
  gives the logged-in user access to it without sudo.
 
+Package: luxafor-status
+Architecture: amd64
+Version: 2.0.0~beta.0
+Priority: optional
+Section: utils
+Maintainer: Néville Dubuis <ndubuis@gmail.com>
+Installed-Size: 7584
+Depends: libc6 (>= 2.35), libgcc-s1 (>= 4.2), libgdk-pixbuf-2.0-0 (>= 2.22.0), libglib2.0-0 (>= 2.53.1), libgtk-3-0 (>= 3.21.5), libayatana-appindicator3-1 | libappindicator3-1, libegl1, libgl1, libx11-6, libxcursor1, libxi6, libxrandr2, libxkbcommon-x11-0, libwayland-client0, pulseaudio-utils
+Recommends: xdg-utils
+Filename: pool/testing/luxafor-status_2.0.0~beta.0_amd64.deb
+Size: 2572968
+MD5sum: f047d1765d6ae41b9ca0007656129921
+SHA1: 6db9dd8597e2213681e048dad4700f206d1cc050
+SHA256: 445eddb7fefabbebd4fe4cae0be78f8dcaf127f8cb817804c0d7282022482b11
+SHA512: 8a822b742bbb074addf264967910c3daae41c3d8cbd2798428432e65e0741180970beb6de3d580b6ab393868511f1168521adb903ec3997c69be7b65cbbc5ba7
+Homepage: https://github.com/NevilleDubuis/luxafor-status-linux
+Description: control a Luxafor status light (ORB, Flag) from the desktop
+ Sets the color of a Luxafor USB status light from a dock launcher, a
+ system tray icon showing the current status, a small panel or the command
+ line, and switches it to a chosen status automatically while you are in a
+ call or while the screen is locked.
+ .
+ Statuses (name, color, blinking) are configurable per user, and can be set
+ for a while (timers). The light is driven directly through its USB HID
+ protocol, with no extra driver; a udev rule gives the logged-in user
+ access to it without sudo.
+
