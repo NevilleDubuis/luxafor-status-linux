@@ -10,9 +10,13 @@ pub fn notify(text: &str, icon: &str, title: &str) {
     let Ok(bus) = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE) else {
         return;
     };
+    // Clicking a notification (even to close it) starts its app: Budgie
+    // looks it up by the desktop-entry hint, else by the app name. "Luxafor"
+    // is the dock launcher, whose click goes to the next status — so name
+    // no app at all: a click just closes the notification.
     let hints = glib::VariantDict::new(None);
     let args = glib::Variant::tuple_from_iter([
-        "Luxafor".to_variant(),
+        "luxafor-status".to_variant(),
         0u32.to_variant(),
         icon.to_variant(),
         title.to_variant(),
