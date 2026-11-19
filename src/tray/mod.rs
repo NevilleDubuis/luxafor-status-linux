@@ -89,6 +89,8 @@ impl Tray {
             .with_id("luxafor-status")
             .with_tooltip("Luxafor")
             .with_icon(make_icon(crate::color::OFF_COLOR, false))
+            // Windows: a left click opens the panel, the menu is on the right.
+            .with_menu_on_left_click(!cfg!(windows))
             .build()
             .map_err(|e| e.to_string())?;
         let mut tray = Tray {
@@ -652,6 +654,7 @@ pub fn main(_args: Vec<String>) -> i32 {
     start_call_detection();
     win::ensure_autostart();
     let mut last_tick = Instant::now();
+    let mut last_panel: Option<Instant> = None;
     let mut locked = false;
     loop {
         win::pump();
@@ -666,7 +669,12 @@ pub fn main(_args: Vec<String>) -> i32 {
                 ..
             } = event
             {
-                tray.spawn(&["panel"]);
+                // One panel per click, even a quick double click (and a
+                // running panel comes to the front instead of a second one).
+                if last_panel.is_none_or(|t| t.elapsed() > Duration::from_millis(1500)) {
+                    last_panel = Some(Instant::now());
+                    tray.spawn(&["panel"]);
+                }
             }
         }
         if tray.quit {

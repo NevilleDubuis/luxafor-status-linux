@@ -679,6 +679,17 @@ impl eframe::App for Panel {
                 self.close = true;
             }
         }
+        #[cfg(not(target_os = "linux"))]
+        if let Ok(tab) = std::fs::read_to_string(raise_file()) {
+            // Another panel was asked for: come to the front instead.
+            let _ = std::fs::remove_file(raise_file());
+            if tab == "settings" {
+                self.tab = Tab::Settings;
+            }
+            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+        }
         if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
             self.close = true;
         }
@@ -780,8 +791,42 @@ fn start_tray() {
     }
 }
 
+/// Windows: one panel at a time. A second one asks the first to come to the
+/// front (through this file) and leaves.
+#[cfg(not(target_os = "linux"))]
+fn raise_file() -> std::path::PathBuf {
+    crate::paths::cache_home().join("luxafor-panel-raise")
+}
+
 pub fn main(args: Vec<String>) -> i32 {
     let settings_tab = args.iter().any(|a| a == "--settings");
+    #[cfg(not(target_os = "linux"))]
+    let _lock = {
+        let path = crate::paths::lock("panel");
+        if let Some(dir) = path.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(path)
+            .ok();
+        match file {
+            Some(f) if f.try_lock().is_ok() => {
+                let _ = std::fs::remove_file(raise_file());
+                Some(f)
+            }
+            Some(_) => {
+                let _ = std::fs::write(
+                    raise_file(),
+                    if settings_tab { "settings" } else { "status" },
+                );
+                return 0;
+            }
+            None => None,
+        }
+    };
     let config = match Config::load(false) {
         Ok(c) => c,
         Err(e) => {

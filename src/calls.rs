@@ -17,6 +17,9 @@ use crate::toggle::try_set_status;
 
 fn log(message: &str) {
     eprintln!("luxafor-callwatch: {message}");
+    // Windows: no terminal to read it from — the tray's log file.
+    #[cfg(windows)]
+    crate::tray::log(&format!("call detection: {message}"));
 }
 
 /// For problems the user must fix: the watcher runs at login, so stderr is
@@ -167,6 +170,8 @@ pub struct Watcher {
     /// status used, the status to restore, and the end of the timer that
     /// was running when the call started.
     active: Option<(String, String, Option<i64>)>,
+    /// Apps using the microphone at the last check.
+    last_users: Vec<String>,
 }
 
 impl Watcher {
@@ -174,7 +179,25 @@ impl Watcher {
         let Ok(config) = Config::load(false) else {
             return;
         };
-        let calling = in_call(&config.call_apps, &mic_streams());
+        let streams = mic_streams();
+        // Which apps use the microphone, each time it changes: the log
+        // tells why a call was (not) detected.
+        let users: Vec<String> = streams
+            .iter()
+            .map(|(name, bin)| format!("{name} ({bin})"))
+            .collect();
+        if users != self.last_users {
+            log(&format!(
+                "microphone used by: {}",
+                if users.is_empty() {
+                    "nobody".to_string()
+                } else {
+                    users.join(", ")
+                }
+            ));
+            self.last_users = users;
+        }
+        let calling = in_call(&config.call_apps, &streams);
         if calling {
             if self.active.is_none() {
                 let call = config.call_status.clone();
@@ -227,6 +250,12 @@ impl Watcher {
 
     /// Watches forever (in its own thread or process).
     pub fn run(mut self) {
+        if let Ok(config) = Config::load(false) {
+            log(&format!(
+                "started — call status: {}, watched apps: {}",
+                config.call_status, config.call_apps
+            ));
+        }
         let old = crate::paths::config_home()
             .join("luxafor-status")
             .join("callwatch.conf");
