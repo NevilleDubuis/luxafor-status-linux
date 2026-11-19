@@ -3,7 +3,8 @@
 [![CI](https://github.com/NevilleDubuis/luxafor-status-linux/actions/workflows/ci.yml/badge.svg)](https://github.com/NevilleDubuis/luxafor-status-linux/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/NevilleDubuis/luxafor-status-linux)](https://github.com/NevilleDubuis/luxafor-status-linux/releases/latest)
 
-Control a **Luxafor** status light from Ubuntu, with:
+Control a **Luxafor** status light from Linux (Ubuntu, Debian…) — and,
+in preview, Windows 11 — with:
 
 - 🖱️ **a dock button** — click to cycle through statuses, right-click to pick one;
 - 🪟 **a quick panel** — big status buttons and one-click durations;
@@ -30,8 +31,8 @@ Default statuses:
 | Off       | ⚪ —      |
 
 Luxafor's official software does not support Linux. This project talks to the
-light directly through its documented USB HID protocol: **no driver to install,
-no Python package, nothing but bash** for the light itself.
+light directly through its documented USB HID protocol: **no driver to
+install** — one small program, written in Rust.
 
 ## Hardware support
 
@@ -58,8 +59,8 @@ sudo apt install luxafor-status
 ```
 
 `apt` installs the dependencies, the udev rule and the launchers. The tray icon
-and the call detection start at each login — to start them right away, open
-**Luxafor Panel** from the app menu once (or log out and back in).
+(which also runs the call detection) starts at each login — to start it right
+away, open **Luxafor Panel** from the app menu once (or log out and back in).
 
 New versions then arrive with `sudo apt upgrade`. Use `testing` instead of
 `stable` to get pre-releases (beta, release candidates) too.
@@ -70,20 +71,40 @@ New versions then arrive with `sudo apt upgrade`. Use `testing` instead of
 
 ### Debian package
 
-Or download the latest `.deb` from the
+Or download the latest `.deb` for your computer (`amd64` for most PCs,
+`arm64` for ARM ones) from the
 [releases page](https://github.com/NevilleDubuis/luxafor-status-linux/releases/latest),
 then:
 
 ```bash
-sudo apt install ./luxafor-status_*_all.deb
+sudo apt install ./luxafor-status_*_amd64.deb
 ```
+
+It works on Ubuntu 22.04 and later, Debian 12 and later.
 
 You'll have to download each new version yourself — the apt repository above
 does it for you.
 
+### Windows 11 (preview)
+
+Download `luxafor-status-…-windows-x64.exe` from the
+[releases page](https://github.com/NevilleDubuis/luxafor-status-linux/releases),
+put it where you keep your programs, and run it: the panel opens and the tray
+icon starts — and from then on, at each login. Nothing to install, no driver.
+
+Windows may warn that the publisher is unknown (the program isn't signed):
+**More info → Run anyway**.
+
+On Windows, a left click on the tray icon opens the panel, a right click the
+menu. The statuses and settings are kept in
+`%APPDATA%\luxafor-status\statuses.conf`. Call detection uses the apps
+Windows lists as using the microphone (Teams, Zoom, browsers). Not there yet:
+notifications and do not disturb.
+
 ### From source
 
-For other distributions, or to try the latest changes:
+For other distributions, or to try the latest changes — you need
+[Rust](https://rustup.rs):
 
 ```bash
 git clone https://github.com/NevilleDubuis/luxafor-status-linux.git
@@ -93,11 +114,12 @@ cd luxafor-status-linux
 
 The installer:
 
-1. installs the required packages (GTK/AppIndicator bindings for the tray icon, `notify-send`);
-2. adds a **udev** rule so the light can be used without `sudo`;
-3. copies the scripts to `~/.local/bin`, adds the launcher to the app menu, and starts the tray icon at login.
+1. installs the packages needed to build (GTK and AppIndicator development files);
+2. builds the program (`cargo build --release`);
+3. adds a **udev** rule so the light can be used without `sudo`;
+4. copies the program to `~/.local/bin`, adds the launcher to the app menu, and starts the tray icon at login.
 
-It only asks for your `sudo` password for steps 1 and 2.
+It only asks for your `sudo` password for steps 1 and 3.
 If the light doesn't respond right away, unplug and replug it.
 
 > [!NOTE]
@@ -120,8 +142,7 @@ Options:
 
   - a status in one click;
   - a timer in one click (`timer-shortcuts`, see [Settings](#settings));
-  - **More…** opens the panel, for any duration and the settings (a
-    middle-click on the dot too);
+  - **More…** opens the panel, for any duration and the settings;
   - while a timer runs, the time left shows next to the dot and at the top of
     the menu, with **Cancel timer**.
 - **Panel**: "Luxafor Panel" in the app menu, or **More…** in the tray menu.
@@ -278,9 +299,9 @@ in the tray. To do it by hand: `luxafor-toggle --apply`.
 
 ## Automatic call status
 
-`luxafor-callwatch` starts at login and watches which applications use your
-microphone. When your web browser starts recording — which is what happens when
-you join a call in Teams, Odoo, Google Meet, Jitsi or any other web app — the
+The tray icon watches which applications use your microphone. When your web
+browser or a call app (Teams, Zoom) starts recording — which is what happens
+when you join a call in Teams, Odoo, Google Meet, Jitsi or any other web app — the
 light switches to your `call-status` (**On a call** by default — see
 [Settings](#settings)). When the call ends, it goes back to the status you had
 before (unless you changed it yourself during the call).
@@ -345,6 +366,13 @@ Translations are welcome — see [CONTRIBUTING](CONTRIBUTING.md#translations).
 
 ## Upgrading from an earlier version
 
+From 1.x to 2.0: v2 is a rewrite in Rust — one program, `luxafor-status`,
+with the same commands as before (`luxafor-toggle`, `luxafor-light`…), the
+same `statuses.conf`, and the same settings. The tray icon now runs the call
+detection itself (no separate `luxafor-callwatch` at login). After upgrading,
+log out and back in once, or open **Luxafor Panel**: the new tray icon
+replaces the old one.
+
 From 0.x to 1.0: `~/.config/luxafor-status/callwatch.conf` is no longer read.
 Its settings moved to `statuses.conf` (`call-status`, `call-apps`; `enabled = no`
 becomes `call-status = none`) — or set them in the panel. A notification
@@ -373,7 +401,7 @@ Your statuses stay in `~/.config/luxafor-status/` (delete that folder to remove 
 Source install:
 
 ```bash
-./uninstall.sh         # removes scripts, launchers and icons
+./uninstall.sh         # removes the program, launchers and icons
 ./uninstall.sh --all   # also removes your statuses and the udev rule
 ```
 
@@ -385,7 +413,8 @@ size is appreciated:
 - 🧪 **testing** with other Luxafor models or Linux distributions / desktops;
 - 🌍 **translations** of the default statuses and messages;
 - 🐛 **bug reports** and fixes;
-- ✨ **ideas** — e.g. automatic status from calendar, screen lock or video calls.
+- 🪟 **Windows 11** testers;
+- ✨ **ideas** — e.g. automatic status from your calendar.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 

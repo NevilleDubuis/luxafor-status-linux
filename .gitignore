@@ -1,6 +1,2 @@
-__pycache__/
-*.pyc
-*.swp
-.DS_Store
-dist/
-/panel.png
+/target
+/dist

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Tests luxafor-light and luxafor-toggle against a fake sysfs and fake
-# /dev/hidraw* files — no light needed. Usage: tests/run.sh
+# Tests luxafor-light, luxafor-toggle and luxafor-callwatch against a fake
+# sysfs and fake /dev/hidraw* files — no light needed.
+# Usage: tests/run.sh [path to the luxafor-status binary]
+# (default: target/debug/luxafor-status — run "cargo build" first)
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -36,8 +38,13 @@ export HOME="$TMP/home" XDG_DATA_HOME="$TMP/data" XDG_CONFIG_HOME="$TMP/config" 
 mkdir -p "$HOME" "$TMP/share/luxafor-status"
 cp "$ROOT/share/statuses.conf" "$TMP/share/luxafor-status/"
 
-LIGHT="$ROOT/bin/luxafor-light"
-TOGGLE="$ROOT/bin/luxafor-toggle"
+# The v1 command names are links to the one program.
+BINARY="$(realpath "${1:-$ROOT/target/debug/luxafor-status}")"
+[ -x "$BINARY" ] || { echo "no $BINARY — run: cargo build" >&2; exit 1; }
+mkdir -p "$TMP/bin"
+for cmd in luxafor-light luxafor-toggle luxafor-callwatch; do ln -s "$BINARY" "$TMP/bin/$cmd"; done
+LIGHT="$TMP/bin/luxafor-light"
+TOGGLE="$TMP/bin/luxafor-toggle"
 bytes() { od -An -tx1 "$TMP/dev/$1" | tr -s ' ' | sed 's/^ //; s/ $//'; }
 
 echo "luxafor-light"
@@ -203,7 +210,7 @@ stream() {  # id app-name binary
     printf 'Source Output #%s\n\tDriver: PipeWire\n\tProperties:\n\t\tapplication.name = "%s"\n\t\tapplication.process.binary = "%s"\n' "$1" "$2" "$3"
 }
 event() { echo "Event '$1' on source-output #$2" >&3; sleep 0.5; }
-WATCH="$ROOT/bin/luxafor-callwatch"
+WATCH="$TMP/bin/luxafor-callwatch"
 # Stops the watcher and its fake "pactl subscribe", which would otherwise
 # keep reading (and stealing) events from the FIFO.
 stop_watch() {
@@ -289,10 +296,9 @@ stop_watch
 "$TOGGLE" --cancel-timer
 
 echo "translations"
-FR_LOCALE="$(locale -a 2>/dev/null | grep -iE '^fr_[A-Z]{2}\.utf-?8$' | head -1)"
-if command -v msgfmt >/dev/null 2>&1 && command -v gettext >/dev/null 2>&1 && [ -n "$FR_LOCALE" ]; then
-    "$ROOT/po/build.sh" "$TMP/locale"
-    fr() { LUXAFOR_LOCALEDIR="$TMP/locale" LC_ALL="$FR_LOCALE" LANGUAGE=fr "$@"; }
+# (translations are built into the program: no locale needs to be installed)
+if true; then
+    fr() { LC_ALL=fr_CH.UTF-8 LANGUAGE=fr "$@"; }
     rm -f "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"   # back to the shipped statuses
     eq "shipped status names translated" "$(fr "$TOGGLE" --list | awk '{print $3, $4}' | paste -sd,)" "Disponible ,Occupé ,En appel,Éteint "
     "$TOGGLE" busy --for 90 >/dev/null 2>&1
@@ -302,8 +308,6 @@ if command -v msgfmt >/dev/null 2>&1 && command -v gettext >/dev/null 2>&1 && [ 
     mkdir -p "$XDG_CONFIG_HOME/luxafor-status"
     printf 'busy | red | Busy\n' > "$XDG_CONFIG_HOME/luxafor-status/statuses.conf"
     eq "the user's own status names are never translated" "$(fr "$TOGGLE" --list | head -1 | awk '{print $3}')" "Busy"
-else
-    echo "  (skipped: needs msgfmt, gettext and a French locale)"
 fi
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"

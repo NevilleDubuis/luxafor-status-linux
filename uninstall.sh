@@ -12,18 +12,17 @@ CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 ALL=0
 [ "${1:-}" = "--all" ] && ALL=1
 
-pkill -f "$BINDIR/luxafor-tray" >/dev/null 2>&1 || true
-pkill -f "$BINDIR/luxafor-callwatch" >/dev/null 2>&1 || true
+pkill -u "$(id -u)" -f "luxafor-(tray|callwatch)" >/dev/null 2>&1 || true
 if [ -x "$BINDIR/luxafor-light" ]; then "$BINDIR/luxafor-light" off >/dev/null 2>&1 || true; fi
 
 rm -f  "$BINDIR/luxafor-light" "$BINDIR/luxafor-toggle" "$BINDIR/luxafor-tray" "$BINDIR/luxafor-callwatch" \
-       "$BINDIR/luxafor-panel"
+       "$BINDIR/luxafor-panel" "$BINDIR/luxafor-status"
 rm -f  "$DATA_HOME/applications/luxafor.desktop" "$DATA_HOME/applications/luxafor-panel.desktop"
 rm -f  "$DATA_HOME/icons/hicolor/scalable/apps/luxafor-status.svg"
 rm -f  "$DATA_HOME"/icons/lxftray-*.svg "$DATA_HOME"/icons/lxftrayx-*.svg
 rm -rf "$DATA_HOME/luxafor-status"
 rm -f  "$CONFIG_HOME/autostart/luxafor-tray.desktop" "$CONFIG_HOME/autostart/luxafor-callwatch.desktop"
-rm -f  "$CACHE_HOME/luxafor-state"
+rm -f  "$CACHE_HOME/luxafor-state" "$CACHE_HOME/luxafor-timer" "$CACHE_HOME/luxafor-tray.log"
 rm -f  "$DATA_HOME"/locale/*/LC_MESSAGES/luxafor-status.mo
 update-desktop-database "$DATA_HOME/applications" >/dev/null 2>&1 || true
 echo "✓ luxafor-status uninstalled"

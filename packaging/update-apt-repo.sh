@@ -1,27 +1,31 @@
 #!/usr/bin/env bash
-# Adds a .deb to the apt repository published on GitHub Pages, and signs it.
+# Adds packages to the apt repository published on GitHub Pages, and signs it.
 #
-# Usage: packaging/update-apt-repo.sh REPO_DIR DEB [KEY_ID]
+# Usage: packaging/update-apt-repo.sh REPO_DIR DEB...
 #   REPO_DIR  checkout of the gh-pages branch (created if empty)
-#   DEB       the package to add
-#   KEY_ID    GPG key to sign with (default: the first secret key)
+#   DEB       the packages to add (one per architecture)
+# Environment: APT_KEY_ID, the GPG key to sign with (default: the first
+# secret key).
 #
 # Suites: "stable" gets releases (vX.Y.Z), "testing" gets every version,
-# pre-releases included. Packages are architecture-independent ("all").
+# pre-releases included. v1 packages were "all"; v2 ones are per
+# architecture.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO="${1:?usage: update-apt-repo.sh REPO_DIR DEB [KEY_ID]}"
-DEB="${2:?usage: update-apt-repo.sh REPO_DIR DEB [KEY_ID]}"
-DEB="$(realpath "$DEB")"
+REPO="${1:?usage: update-apt-repo.sh REPO_DIR DEB...}"
+shift
+[ $# -gt 0 ] || { echo "usage: update-apt-repo.sh REPO_DIR DEB..." >&2; exit 2; }
+DEBS=()
+for deb in "$@"; do DEBS+=("$(realpath "$deb")"); done
 mkdir -p "$REPO"
 REPO="$(realpath "$REPO")"
-KEY="${3:-$(gpg --list-secret-keys --with-colons | awk -F: '$1 == "fpr" { print $10; exit }')}"
+KEY="${APT_KEY_ID:-$(gpg --list-secret-keys --with-colons | awk -F: '$1 == "fpr" { print $10; exit }')}"
 [ -n "$KEY" ] || { echo "No GPG secret key to sign with" >&2; exit 1; }
 ARCHES="amd64 arm64 armhf i386"
 URL="https://nevilledubuis.github.io/luxafor-status-linux"
 
-version="$(dpkg-deb -f "$DEB" Version)"
+version="$(dpkg-deb -f "${DEBS[0]}" Version)"
 suites=(testing)
 [[ "$version" == *"~"* ]] || suites+=(stable)
 
@@ -31,7 +35,7 @@ gpg --armor --export "$KEY" > key.asc
 
 for suite in "${suites[@]}"; do
     mkdir -p "pool/$suite"
-    cp "$DEB" "pool/$suite/"
+    cp "${DEBS[@]}" "pool/$suite/"
 done
 
 for suite in stable testing; do
@@ -40,7 +44,8 @@ for suite in stable testing; do
     rm -rf "$dists"
     for arch in all $ARCHES; do
         mkdir -p "$dists/main/binary-$arch"
-        apt-ftparchive packages "pool/$suite" > "$dists/main/binary-$arch/Packages"
+        # Packages of this architecture, and "all" ones.
+        apt-ftparchive --arch "$arch" packages "pool/$suite" > "$dists/main/binary-$arch/Packages"
         gzip -9nk "$dists/main/binary-$arch/Packages"
     done
     apt-ftparchive \

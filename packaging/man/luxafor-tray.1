@@ -15,8 +15,7 @@ opens
 .BR luxafor-panel (1)
 with
 .B "More..."
-for any other duration and the settings (also with a middle-click on the
-icon), turns the light off, or quits. While a timer runs, the time left is
+for any other duration and the settings, turns the light off, or quits. While a timer runs, the time left is
 shown next to the dot and at the top of the menu, with an entry to cancel it.
 .PP
 It follows changes made by
@@ -41,6 +40,9 @@ While the status is one of
 desktop notifications are silenced through the desktop's own "do not
 disturb" switch; the user's setting is put back afterwards and when the tray
 quits.
+.PP
+It also runs the call detection, see
+.BR luxafor-callwatch (1).
 .PP
 It is started at login through
 .IR /etc/xdg/autostart/luxafor-tray.desktop .

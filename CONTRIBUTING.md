@@ -25,11 +25,12 @@ Running `luxafor-toggle` from a terminal usually prints a useful error message.
 3. Run the checks — CI runs the same ones on every pull request:
 
    ```bash
-   tests/run.sh                 # driver and statuses, no light needed
-   xvfb-run -a dbus-run-session -- tests/ui.py   # panel and tray
-   shellcheck install.sh uninstall.sh bin/luxafor-light bin/luxafor-toggle \
-              bin/luxafor-callwatch packaging/build-deb.sh tests/run.sh
-   python3 -m py_compile bin/luxafor-tray bin/luxafor-panel
+   sudo apt install libgtk-3-dev libayatana-appindicator3-dev   # to build
+   cargo fmt --check && cargo clippy -- -D warnings
+   cargo test                   # unit tests
+   cargo build && tests/run.sh  # command line, with a fake light
+   xvfb-run -a dbus-run-session -- tests/ui.sh   # tray and panel
+   shellcheck install.sh uninstall.sh packaging/*.sh tests/*.sh po/*.sh
    ```
 
 4. Test `./install.sh` and `./uninstall.sh` on your machine if you touched them.
@@ -38,18 +39,21 @@ Running `luxafor-toggle` from a terminal usually prints a useful error message.
 ## Building the package
 
 ```bash
-packaging/build-deb.sh 0.1.0       # → dist/luxafor-status_0.1.0_all.deb
+cargo build --release
+packaging/build-deb.sh 2.0.0       # → dist/luxafor-status_2.0.0_amd64.deb
 lintian --pedantic dist/*.deb      # should print nothing
 ```
 
-It only needs `dpkg-deb` (no debhelper). The package installs to `/usr`, puts
+It only needs `dpkg-deb` and `dpkg-shlibdeps` (no debhelper). The package
+installs to `/usr` (`luxafor-status`, and the v1 command names as links), puts
 the udev rule in `/usr/lib/udev/rules.d` and starts the tray icon through
-`/etc/xdg/autostart`.
+`/etc/xdg/autostart`. Releases are built on Ubuntu 22.04 so the packages work
+there and later.
 
 ## Releasing
 
 Push a version tag; the *Release* workflow tests, builds and publishes a GitHub
-release with the `.deb` attached:
+release with the packages (amd64, arm64) and the Windows `.exe` attached:
 
 ```bash
 git tag v0.1.0
@@ -82,26 +86,32 @@ sorts before `0.3.0`. Tags that aren't `vX.Y.Z[-suffix]` are rejected.
 ## Project layout
 
 ```
-bin/luxafor-light      driver: writes HID reports to /dev/hidraw* (pure bash)
-bin/luxafor-toggle     sets or cycles the status (calls luxafor-light), and generates
-                       the status icons and the dock launcher (--reload)
-bin/luxafor-tray       tray icon showing the current status (Python + AppIndicator)
-bin/luxafor-callwatch  call detection: watches microphone streams with `pactl`
-bin/luxafor-panel      panel (Python + GTK 3): Status tab runs luxafor-toggle for every
-                       action; Settings tab reads settings through luxafor-toggle and
-                       rewrites statuses.conf
+src/main.rs            one program, several commands (also reached through the
+                       v1 command names: luxafor-toggle → toggle…)
+src/toggle.rs          luxafor-toggle: sets or cycles the status, timers, settings
+src/lightcli.rs        luxafor-light: the light alone
+src/light.rs           driver: Linux writes HID reports to /dev/hidraw* (found
+                       through sysfs), Windows uses hidapi
+src/config.rs          statuses.conf: reading, settings, writing (panel)
+src/state.rs           current status and timer files, durations
+src/calls.rs           call detection: pactl (Linux), Windows' microphone list
+src/tray/              tray icon (tray-icon crate): menu, light unplugged,
+                       screen lock, do not disturb; runs the call detection
+src/panel/             panel (egui): Status and Settings tabs; model.rs holds
+                       the Settings logic, unit-tested
+src/i18n.rs            translations, built in from po/*.po
+src/desktop.rs         Linux dock launcher and notification icons (--reload)
 share/statuses.conf    default status configuration
 share/icons/           application icon (luxafor-status)
-share/applications/    autostart templates (@BINDIR@ is replaced at install time)
+share/applications/    launcher templates (@BINDIR@ is replaced at install time)
 udev/                  udev rule granting the logged-in user access to the light
-install.sh             per-user installer (from source)
-uninstall.sh           uninstaller for the per-user install
+install.sh             per-user install from source
 packaging/             .deb build script, apt repository script, man pages, AppStream metadata
-tests/run.sh           tests with a fake light
-tests/ui.py            panel and tray tests, under a virtual display
-po/                    translations (gettext): template, *.po, build and update scripts
+tests/run.sh           command-line tests with a fake light (from v1)
+tests/ui.sh            tray and panel, under a virtual display
+po/                    translations: template, *.po, extract and update scripts
 docs/                  README images
-.github/workflows/     CI (checks + package build) and releases
+.github/workflows/     CI and releases
 ```
 
 Runtime files:
@@ -109,30 +119,29 @@ Runtime files:
 - `~/.config/luxafor-status/statuses.conf` — the user's statuses
   (`id | color | label [| effect]`) and settings (`key = value`: `default-status`,
   `call-status`, `call-apps`, `lock-status`, `dnd-statuses`, `timer-shortcuts`,
-  `brightness`, `theme`). `luxafor-toggle` and `luxafor-tray` both parse the statuses
-  and must stay in sync if the format changes; other tools read settings with
-  `luxafor-toggle --setting <key>`.
+  `brightness`, `theme`), read by src/config.rs. On Windows:
+  `%APPDATA%\luxafor-status\statuses.conf`, and the files below are in
+  `%LOCALAPPDATA%\luxafor-status`.
 - `~/.cache/luxafor-dnd` — while the tray has silenced notifications: the
   user's own do-not-disturb setting, put back afterwards (also after a crash).
 - `~/.cache/luxafor-state` — the current status id. The tray icon polls it
   (and the config file's modification time) every second, so any tool that
   calls `luxafor-toggle` keeps the tray in sync.
 - `~/.cache/luxafor-timer` — the running timer, `<end epoch> <status id>`.
-  A background `luxafor-toggle --timer-expire` process ends it; it checks the
-  wall clock every 20 s so suspend doesn't delay it, and exits as soon as the
-  file changes (status set by hand, new timer, cancel). `--keep-timer` (used
-  by `luxafor-callwatch`) sets a status without cancelling the timer.
+  A background `luxafor-status toggle --timer-expire` process ends it; it
+  checks the wall clock every 20 s so suspend doesn't delay it, and exits as
+  soon as the file changes (status set by hand, new timer, cancel).
+  `--keep-timer` (used by the tray for the screen lock) sets a status without
+  cancelling the timer.
+- `~/.cache/luxafor-tray.log` — errors met by the tray.
+- `$XDG_RUNTIME_DIR/luxafor-*.lock` — one call detection per user (and one
+  timer ending at a time; on Windows, one tray).
 - `~/.local/share/luxafor-status/icons/` — one generated SVG per status (notifications).
-- `~/.local/share/icons/lxftrayx-<id>-<hash>.svg` — the same, as a dashed
-  ring, shown while the light is unplugged. The tray checks sysfs every second
-  (same lookup as `luxafor-light`, honouring `LUXAFOR_IDS` / `LUXAFOR_SYSFS`)
-  and runs `luxafor-toggle --apply` when the light comes back.
-- `~/.local/share/icons/lxftray-<id>-<hash>.svg` — tray icons, written by
-  `luxafor-tray`. They live in the standard icon folder because some tray hosts
-  (e.g. Budgie) ignore the indicator's custom icon path; the color hash in the
-  name prevents hosts from showing a cached icon after a color change.
-  The prefix deliberately shares nothing with other icon names — see the
-  comment in `bin/luxafor-tray` (GTK generic fallback).
+
+The tray checks every second whether the light is plugged in (same lookup as
+`luxafor-light`, honouring `LUXAFOR_IDS` / `LUXAFOR_SYSFS`), and shows the
+current status on it again when it comes back. Its icon is drawn by the
+program (a disc, or a dashed ring while the light is unplugged).
 
 ## Testing without a light
 
@@ -144,24 +153,23 @@ mkdir -p /tmp/lx/sys/class/hidraw/hidraw0/device /tmp/lx/dev
 printf 'HID_ID=0003:000004D8:0000F372\nHID_NAME=Fake Luxafor\n' \
   > /tmp/lx/sys/class/hidraw/hidraw0/device/uevent
 touch /tmp/lx/dev/hidraw0
-LUXAFOR_SYSFS=/tmp/lx/sys LUXAFOR_DEV=/tmp/lx/dev bin/luxafor-light orange
+LUXAFOR_SYSFS=/tmp/lx/sys LUXAFOR_DEV=/tmp/lx/dev target/debug/luxafor-status light orange
 od -An -tx1 /tmp/lx/dev/hidraw0     # 00 01 ff ff a5 00 00 00 00
 ```
 
-To support another model, add its `vendor:product` ID to `IDS` in
-`bin/luxafor-light` and to `udev/70-luxafor-status.rules`.
+To support another model, add its `vendor:product` ID to `ids()` in
+`src/light.rs` and to `udev/70-luxafor-status.rules`.
 
 ## Translations
 
-Messages use gettext (domain `luxafor-status`): `_()` in the Python scripts,
-`t` / `tf` (printf format) in the shell scripts — one call per line start,
-so `xgettext` sees it.
+Messages are marked with `tr("…")`, or `trf("… {name} …", &[("name", &value)])`
+for placeholders. The `.po` files (gettext format) are built into the program:
+nothing to compile or install.
 
-- Add a language: `msginit -i po/luxafor-status.pot -l de -o po/de.po`, translate,
-  open a pull request.
+- Add a language: `msginit -i po/luxafor-status.pot -l de -o po/de.po`,
+  translate, add the file to `CATALOGS` in `src/i18n.rs`, open a pull request.
 - After changing messages: `po/update-pot.sh` (CI checks the template is up to date).
-- Try it: `po/build.sh /tmp/locale && LUXAFOR_LOCALEDIR=/tmp/locale LANGUAGE=de luxafor-panel`
-  (shell scripts also need a matching locale, e.g. `LC_ALL=de_DE.UTF-8`).
+- Try it: `LUXAFOR_LANG=de cargo run -- panel`.
 
 The names of the shipped statuses (`share/statuses.conf`) are translated
 until the user has statuses of their own.
