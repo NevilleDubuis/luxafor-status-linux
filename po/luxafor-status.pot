@@ -8,19 +8,19 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: src/calls.rs:26
+#: src/calls.rs:29
 msgid "Luxafor call detection"
 msgstr ""
 
-#: src/calls.rs:234
+#: src/calls.rs:263
 msgid "callwatch.conf is no longer read: set the call status and the watched apps in Luxafor Panel → Settings (call-status, call-apps in statuses.conf)"
 msgstr ""
 
-#: src/calls.rs:240
+#: src/calls.rs:269
 msgid "pactl not found — install it with: sudo apt install pulseaudio-utils"
 msgstr ""
 
-#: src/config.rs:319 src/desktop.rs:74 src/panel/mod.rs:353 src/toggle.rs:271 src/tray/mod.rs:216
+#: src/config.rs:319 src/desktop.rs:74 src/panel/mod.rs:353 src/toggle.rs:271 src/tray/mod.rs:218
 msgid "Off"
 msgstr ""
 
@@ -92,7 +92,7 @@ msgstr ""
 msgid "No timer"
 msgstr ""
 
-#: src/panel/mod.rs:298 src/tray/mod.rs:194
+#: src/panel/mod.rs:298 src/tray/mod.rs:196
 msgid "Cancel timer"
 msgstr ""
 
@@ -232,11 +232,11 @@ msgstr ""
 msgid "Saved."
 msgstr ""
 
-#: src/panel/mod.rs:694
+#: src/panel/mod.rs:705
 msgid "Status"
 msgstr ""
 
-#: src/panel/mod.rs:695
+#: src/panel/mod.rs:706
 msgid "Settings"
 msgstr ""
 
@@ -268,7 +268,7 @@ msgstr ""
 msgid "{hours} h {minutes}"
 msgstr ""
 
-#: src/toggle.rs:78 src/tray/mod.rs:267
+#: src/toggle.rs:78 src/tray/mod.rs:269
 msgid "{status} — light not connected"
 msgstr ""
 
@@ -292,31 +292,31 @@ msgstr ""
 msgid "{status} for {duration} — until {time}"
 msgstr ""
 
-#: src/tray/mod.rs:155
+#: src/tray/mod.rs:157
 msgid "{status} until {time} ({left} left)"
 msgstr ""
 
-#: src/tray/mod.rs:186
+#: src/tray/mod.rs:188
 msgid "Light not connected"
 msgstr ""
 
-#: src/tray/mod.rs:204
+#: src/tray/mod.rs:206
 msgid "{status} for {duration}"
 msgstr ""
 
-#: src/tray/mod.rs:213
+#: src/tray/mod.rs:215
 msgid "More…"
 msgstr ""
 
-#: src/tray/mod.rs:218
+#: src/tray/mod.rs:220
 msgid "Quit"
 msgstr ""
 
-#: src/tray/mod.rs:370
+#: src/tray/mod.rs:372
 msgid "Light disconnected — {status} will be shown again when it's plugged back in"
 msgstr ""
 
-#: src/tray/mod.rs:391
+#: src/tray/mod.rs:393
 msgid "Light reconnected — {status}"
 msgstr ""
 
